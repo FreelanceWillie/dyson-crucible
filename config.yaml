@@ -1,0 +1,103 @@
+# Art Conductor - central configuration
+# ---------------------------------------------------------------------------
+# This file is loaded once at startup (searched from the repo root). Every
+# value has a sane default baked into the code, so a missing key is never fatal
+# but keeping them here makes the whole pipeline tunable in one place.
+
+# --- Which "brain" (LLM) refines your briefs from plain-language feedback? ---
+# local      = talk to a local Ollama server (fully offline, $0, default).
+# gemini_api = Google Generative Language REST API (needs an API key).
+# claude     = shell out to the `claude` CLI on your PATH.
+brain: local
+
+# --- Local brain (Ollama) settings ---
+ollama_model: qwen2.5:7b-instruct   # any instruct model you have pulled
+ollama_url: http://localhost:11434  # default Ollama daemon address
+
+# --- Gemini API brain settings ---
+gemini_api_key_env: GEMINI_API_KEY  # name of the env var holding the key
+gemini_model: gemini-2.0-flash      # fast + cheap; good enough for slot-filling
+
+# --- Claude CLI brain settings ---
+claude_cmd: claude                  # command invoked as: claude -p "<prompt>"
+
+# --- Where things live on disk (relative to the repo root) ---
+paths:
+  references: references            # your style reference images (per set)
+  briefs: briefs                    # one folder per asset, holds brief.yaml
+  outputs: outputs                  # generated candidates + chosen.png
+  vectors: vectors                  # vectorized SVGs
+
+# --- Generation engine ---
+# comfyui   = drive a local ComfyUI server over its HTTP API (recommended:
+#             self-healing, queue-native, handles the models for you).
+# diffusers = run Stable Diffusion in-process via HuggingFace diffusers (simpler
+#             to install, no ComfyUI needed, but no queue UI).
+engine: comfyui
+
+# --- ComfyUI engine settings (engine: comfyui) ---
+comfyui:
+  url: http://127.0.0.1:8188        # ComfyUI server address
+  exe: ""                           # OPTIONAL: path to a launcher (e.g. run_nvidia_gpu.bat)
+                                    # so the daemon can auto-start ComfyUI if it is down (self-heal)
+  root: ""                          # OPTIONAL: ComfyUI install dir. Model Manager installs
+                                    # LoRAs/ControlNets under <root>/models/. Leave blank to
+                                    # auto-detect near comfyui.exe.
+  workflow: workflows/sd15_ipadapter.json       # single-reference template (API format)
+  workflow_multi: workflows/sd15_multi_ipadapter.json  # multi-image (style + subject) template
+  checkpoint: v1-5-pruned-emaonly.safetensors  # SD1.5 checkpoint filename in ComfyUI/models/checkpoints
+  ip_adapter_preset: PLUS           # IP-Adapter preset node value
+
+# --- Model Manager (models.py): search + install LoRAs/ControlNets from Civitai ---
+models:
+  civitai_api: https://civitai.com/api/v1
+  civitai_token_env: CIVITAI_TOKEN  # OPTIONAL free token for higher limits / gated files
+
+# --- Web reference fetch (webref.py): pull style/subject refs from an image search ---
+# NOTE: fetched images are for PRIVATE reference only. Do not ship copyrighted or
+# trademarked characters in your game. The UI surfaces this warning.
+webref:
+  provider: duckduckgo              # keyless image search
+  max_images: 8
+
+# --- Post-processing: an ORDERED, composable chain of steps run after a pick.
+# Vectorize is just ONE optional step now, not a forced part of the loop. Build
+# your own named chains; the UI lets you pick/configure them per asset.
+postprocess:
+  default_chain: []                 # e.g. [ {step: trim}, {step: upscale, params:{scale:2}}, {step: vectorize} ]
+  chains:                           # named reusable chains he can build in the GUI
+    to_vector: [ {step: trim}, {step: palette_reduce, params: {colors: 12}}, {step: vectorize} ]
+    clean_png: [ {step: bg_remove}, {step: trim} ]
+    game_sprite: [ {step: bg_remove}, {step: trim, params: {pad: 4}} ]  # transparent, tightly-cropped PNG ready to drop into a game
+    hi_res: [ {step: upscale, params: {scale: 2}}, {step: trim} ]
+
+# --- Image generation (shared by both engines) ---
+gen:
+  base_model: runwayml/stable-diffusion-v1-5  # diffusers HF id or local path
+  steps: 28                         # diffusion steps (quality vs speed)
+  cfg: 7.0                          # classifier-free guidance scale
+  width: 512                        # 512 is the safe size for a 4GB GPU (SD1.5 native)
+  height: 512
+  ip_adapter: true                  # steer with reference images (IP-Adapter)
+  n_candidates: 4                   # how many images to gen per run
+
+# --- Low-VRAM safety (4GB cards). The dashboard Doctor recommends launching
+# ComfyUI with --lowvram so the model streams from system RAM (no OOM crash;
+# gens are slower when they spill). Keep width/height <= 512 on 4GB. ---
+low_vram:
+  enabled: true                     # UI clamps size + recommends the --lowvram flag
+  max_dim: 512                      # do not let a 4GB card exceed this per side
+
+# --- Gen queue + self-healing (jobs.py) ---
+queue:
+  poll_seconds: 2                   # how often the worker polls ComfyUI/job state
+  max_retries: 3                    # retry a failed gen job this many times
+  restart_engine_on_fail: true      # if ComfyUI dies mid-job, relaunch it (needs comfyui.exe)
+
+# --- Ranking (CLIP similarity to your references via rank.py) ---
+rank:
+  clip_model: ViT-B-32              # open_clip model name
+
+# --- Vectorization (raster -> SVG via vectorize.py) ---
+vector:
+  colors: 12                        # posterization palette size

@@ -1,0 +1,21 @@
+# Art Conductor - Python dependencies
+#
+# NOTE: torch + torchvision are NOT listed here. They must be installed
+# separately from the CUDA wheel index so you get the GPU build:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+# The setup scripts (setup.ps1 / setup.sh) do this for you.
+#
+# NOTE: ComfyUI and Ollama are SEPARATE installs (not pip packages).
+# The setup script and README explain how to get them.
+
+diffusers
+transformers
+accelerate
+safetensors
+huggingface_hub
+open_clip_torch
+pillow
+pyyaml
+requests
+vtracer
+psutil        # live CPU/RAM/disk meters for the dashboard

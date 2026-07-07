@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Art Conductor</title>
+<style>
+  :root{
+    --bg:#0e1116; --bg2:#151a22; --panel:#1a212c; --panel2:#212a37;
+    --line:#2b3644; --line2:#38475a;
+    --ink:#e8edf4; --ink-dim:#9aa7b8; --ink-faint:#697585;
+    --accent:#6ea8fe; --accent2:#8f7dff; --good:#4ade80; --bad:#f87171;
+    --warn:#fbbf24; --chip:#243040; --shadow:0 6px 24px rgba(0,0,0,.35);
+    --on-accent:#0b1220; --glow:#1b2433;
+    --r:14px; --r-sm:9px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f5; --bg2:#e3e8ef; --panel:#ffffff; --panel2:#f3f5f9;
+    --line:#d3dae3; --line2:#b9c3d0;
+    --ink:#1a2230; --ink-dim:#516074; --ink-faint:#7d8b9d;
+    --accent:#2f6fed; --accent2:#7857e6; --good:#16a34a; --bad:#dc2626;
+    --warn:#d97706; --chip:#e7edf5; --shadow:0 6px 22px rgba(30,45,70,.14);
+    --on-accent:#ffffff; --glow:#dbe4f2;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(1200px 600px at 80% -10%,var(--glow) 0%,var(--bg) 55%);
+    color:var(--ink); font-family:var(--font); font-size:14px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  :root[data-motion="reduce"] *{animation-duration:.001s!important;transition-duration:.001s!important}
+  button{font-family:inherit;cursor:pointer;border:none;color:inherit}
+  input,textarea{font-family:inherit;color:inherit}
+  a{color:var(--accent)}
+  .app{display:grid;grid-template-columns:280px 1fr;
+       grid-template-rows:auto auto auto 1fr auto auto;
+       height:100vh;gap:0}
+  /* row1=topbar row2=resdetail row3=doctor row4=main/rail row5=queuestrip row6=qpanel */
+  /* ---------- left rail ---------- */
+  .rail{grid-column:1/2;grid-row:4/7;background:var(--bg2);border-right:1px solid var(--line);
+        display:flex;flex-direction:column;min-height:0}
+  .brand{display:flex;align-items:center;gap:10px;padding:18px 18px 12px}
+  .brand .dot{width:11px;height:11px;border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    box-shadow:0 0 12px var(--accent)}
+  .brand h1{font-size:16px;margin:0;letter-spacing:.3px;font-weight:650}
+  .brand small{display:block;color:var(--ink-faint);font-weight:400;font-size:11px}
+  .newbtn{margin:4px 14px 12px;padding:11px 14px;border-radius:var(--r-sm);
+    background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0b1220;
+    font-weight:650;font-size:13px;transition:transform .12s,box-shadow .12s;
+    box-shadow:0 4px 14px rgba(110,168,254,.28)}
+  .newbtn:hover{transform:translateY(-1px);box-shadow:0 7px 20px rgba(110,168,254,.4)}
+  .newbtn:active{transform:translateY(0)}
+  .assets{overflow-y:auto;flex:1;padding:2px 10px 12px;min-height:0}
+  /* ---------- category tree ---------- */
+  .treehead{display:flex;align-items:center;justify-content:space-between;
+    padding:2px 6px 8px;gap:8px}
+  .treehead .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.7px;
+    color:var(--ink-faint);font-weight:650}
+  .addcat{padding:6px 11px;border-radius:20px;background:var(--panel2);
+    border:1px solid var(--line2);font-size:12px;font-weight:600;color:var(--ink);
+    transition:background .12s;flex:none;min-height:32px}
+  .addcat:hover{background:#2a3648}
+  .node{margin-bottom:2px}
+  .noderow{display:flex;align-items:center;gap:4px;padding:7px 6px;border-radius:var(--r-sm);
+    transition:background .12s;position:relative}
+  .noderow:hover{background:var(--panel)}
+  .noderow.sel{background:var(--panel2);box-shadow:inset 0 0 0 1px var(--line2)}
+  .twist{width:20px;height:20px;flex:none;display:flex;align-items:center;justify-content:center;
+    color:var(--ink-faint);font-size:10px;background:transparent;border-radius:5px;
+    transition:transform .12s}
+  .twist:hover{color:var(--ink);background:var(--line)}
+  .twist.open{transform:rotate(90deg)}
+  .twist.leaf{visibility:hidden}
+  .noderow .cname{flex:1;min-width:0;font-weight:600;font-size:13px;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;background:transparent;text-align:left;
+    display:flex;align-items:center;gap:6px}
+  .noderow .cname .ico{color:var(--ink-faint);font-size:12px;flex:none}
+  .noderow .cnt{color:var(--ink-faint);font-size:11px;flex:none}
+  .nodeacts{display:flex;gap:1px;flex:none;opacity:0;transition:opacity .12s}
+  .noderow:hover .nodeacts,.noderow.sel .nodeacts{opacity:1}
+  .iconbtn{width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;
+    border-radius:6px;background:transparent;color:var(--ink-faint);font-size:14px;
+    transition:background .12s,color .12s}
+  .iconbtn:hover{background:var(--line);color:var(--ink)}
+  .iconbtn.danger:hover{background:#3a2020;color:var(--bad)}
+  .kids{margin-left:14px;border-left:1px solid var(--line);padding-left:4px}
+  .grouphdr{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-faint);
+    font-weight:650;padding:10px 8px 4px}
+  /* ---------- category settings form ---------- */
+  .catform label{display:block;font-size:12px;color:var(--ink-dim);margin:14px 0 5px;
+    font-weight:600}
+  .catform input,.catform textarea{width:100%;background:var(--bg2);border:1px solid var(--line2);
+    border-radius:9px;padding:10px 12px;font-size:13px;outline:none;transition:border-color .12s}
+  .catform input:focus,.catform textarea:focus{border-color:var(--accent)}
+  .catform textarea{resize:vertical;min-height:64px}
+  .catform .helper{color:var(--ink-faint);font-size:12px;margin:4px 0 0;line-height:1.5}
+  .catform .refhint{background:var(--bg2);border:1px solid var(--line);border-radius:9px;
+    padding:11px 13px;margin-top:16px;font-size:12.5px;color:var(--ink-dim);line-height:1.55}
+  .catform .refhint code{font-family:var(--mono);color:var(--ink);background:var(--chip);
+    padding:2px 6px;border-radius:5px;font-size:12px}
+  .selrow{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .selrow label{margin:0;font-size:12px;color:var(--ink-dim);font-weight:600;flex:none}
+  select{background:var(--bg2);border:1px solid var(--line2);border-radius:9px;
+    padding:9px 11px;font-size:13px;color:var(--ink);outline:none;font-family:inherit;
+    max-width:100%;transition:border-color .12s}
+  select:focus{border-color:var(--accent)}
+  .asset{display:flex;gap:11px;align-items:center;padding:9px;border-radius:var(--r-sm);
+    margin-bottom:5px;transition:background .12s;position:relative;width:100%;text-align:left;
+    background:transparent}
+  .asset:hover{background:var(--panel)}
+  .asset.sel{background:var(--panel2);box-shadow:inset 0 0 0 1px var(--line2)}
+  .asset .thumb{width:42px;height:42px;border-radius:8px;flex:none;object-fit:cover;
+    background:var(--panel);border:1px solid var(--line)}
+  .asset .thumb.ph{display:flex;align-items:center;justify-content:center;
+    color:var(--ink-faint);font-size:18px}
+  .asset .meta{min-width:0;flex:1}
+  .asset .nm{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis}
+  .asset .sub{color:var(--ink-faint);font-size:11px;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis}
+  .sdot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--ink-faint)}
+  .sdot.chosen{background:var(--good);box-shadow:0 0 7px var(--good)}
+  .sdot.cands{background:var(--accent)}
+  .brainbar{padding:10px 16px;border-top:1px solid var(--line);display:flex;
+    align-items:center;gap:9px;font-size:12px;color:var(--ink-dim)}
+  .brainbar .b{width:9px;height:9px;border-radius:50%;background:var(--ink-faint)}
+  .brainbar .b.ok{background:var(--good);box-shadow:0 0 8px var(--good)}
+  .brainbar .b.no{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+  /* ---------- center ---------- */
+  .main{grid-column:2/3;grid-row:4/5;overflow-y:auto;min-height:0;padding:22px 26px 30px}
+  .empty{height:100%;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;color:var(--ink-dim);gap:14px}
+  .empty .big{font-size:44px;opacity:.7}
+  .empty h2{margin:0;color:var(--ink);font-weight:600}
+  .empty p{margin:0;max-width:380px}
+  .head{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+  .head h2{margin:0;font-size:22px;font-weight:650}
+  .head .pmt{color:var(--ink-dim);font-size:13px;margin-top:3px;max-width:560px}
+  .head .actions{margin-left:auto;display:flex;gap:9px}
+  .btn{padding:9px 15px;border-radius:var(--r-sm);background:var(--panel2);
+    border:1px solid var(--line2);font-size:13px;font-weight:600;color:var(--ink);
+    transition:background .12s,transform .1s;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{background:#2a3648}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#0b1220;border-color:transparent}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .grid2{display:grid;grid-template-columns:1fr 360px;gap:22px;align-items:start}
+  @media(max-width:1000px){.grid2{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+    padding:18px;box-shadow:var(--shadow)}
+  .card h3{margin:0 0 13px;font-size:13px;text-transform:uppercase;letter-spacing:.7px;
+    color:var(--ink-dim);font-weight:650}
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .cand{position:relative;border-radius:10px;overflow:hidden;background:var(--bg2);
+    border:1px solid var(--line);aspect-ratio:1;cursor:zoom-in;transition:transform .12s,
+    box-shadow .12s}
+  .cand:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  .cand img{width:100%;height:100%;object-fit:cover;display:block}
+  .cand.chosen{outline:2px solid var(--good);outline-offset:-2px}
+  .cand .badge{position:absolute;top:7px;left:7px;background:var(--good);color:#062810;
+    font-size:10px;font-weight:700;padding:3px 7px;border-radius:20px}
+  .cand .pick{position:absolute;bottom:7px;left:7px;right:7px;padding:7px;border-radius:7px;
+    background:rgba(14,17,22,.82);backdrop-filter:blur(3px);font-size:12px;font-weight:600;
+    opacity:0;transition:opacity .12s;color:var(--ink)}
+  .cand:hover .pick{opacity:1}
+  .cand .pick:hover{background:var(--accent);color:#0b1220}
+  .emptycands{color:var(--ink-faint);font-size:13px;padding:16px 4px;text-align:center}
+  .vecwrap{margin-top:14px;border-radius:10px;background:#fff;padding:12px;
+    display:flex;justify-content:center}
+  .vecwrap img,.vecwrap svg{max-width:100%;max-height:340px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+  .chip{background:var(--chip);border:1px solid var(--line2);border-radius:20px;
+    padding:5px 11px;font-size:12px;color:var(--ink-dim);max-width:100%}
+  .chip b{color:var(--ink);font-weight:600}
+  .chip.neg{border-color:#5b2b2b}
+  /* ---------- chat ---------- */
+  .chat{display:flex;flex-direction:column;max-height:calc(100vh - 180px)}
+  .chatlog{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:9px;
+    padding-right:4px;margin-bottom:12px;min-height:120px}
+  .msg{padding:9px 12px;border-radius:12px;font-size:13px;max-width:92%;white-space:pre-wrap;
+    word-wrap:break-word}
+  .msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#0b1220;border-bottom-right-radius:4px}
+  .msg.assistant{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);
+    border-bottom-left-radius:4px}
+  .msg.system{align-self:center;background:transparent;color:var(--ink-faint);font-size:11.5px;
+    font-style:italic;max-width:100%;text-align:center}
+  .chatempty{color:var(--ink-faint);font-size:12.5px;text-align:center;padding:14px}
+  .composer{border-top:1px solid var(--line);padding-top:12px}
+  .composer textarea{width:100%;background:var(--bg2);border:1px solid var(--line2);
+    border-radius:10px;padding:10px 12px;font-size:13px;resize:none;min-height:58px;
+    outline:none;transition:border-color .12s}
+  .composer textarea:focus{border-color:var(--accent)}
+  .composer .row{display:flex;align-items:center;gap:10px;margin-top:9px}
+  .toggle{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    cursor:pointer;user-select:none;margin-right:auto}
+  .sw{width:34px;height:19px;border-radius:20px;background:var(--line2);position:relative;
+    transition:background .15s;flex:none}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;
+    border-radius:50%;background:#fff;transition:transform .15s}
+  .toggle input{display:none}
+  .toggle input:checked + .sw{background:var(--accent)}
+  .toggle input:checked + .sw::after{transform:translateX(15px)}
+  /* ---------- queue strip ---------- */
+  .queue{grid-column:2/3;grid-row:5/6;background:var(--bg2);border-top:1px solid var(--line);
+    padding:10px 20px;display:flex;align-items:center;gap:14px;overflow-x:auto;min-height:56px}
+  .queue .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--ink-faint);
+    font-weight:650;flex:none}
+  .qjob{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);
+    border-radius:20px;padding:6px 12px;font-size:12px;flex:none;white-space:nowrap}
+  .qjob .k{color:var(--ink-faint);font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+  .qjob .st{font-weight:600}
+  .qjob.done .st{color:var(--good)} .qjob.error .st{color:var(--bad)}
+  .qjob.running .st{color:var(--accent)} .qjob.queued .st{color:var(--warn)}
+  .qjob .tries{color:var(--ink-faint);font-size:10px}
+  .qempty{color:var(--ink-faint);font-size:12px}
+  .spin{width:12px;height:12px;border-radius:50%;border:2px solid var(--line2);
+    border-top-color:var(--accent);animation:spin .7s linear infinite;flex:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  /* ---------- lightbox / modal ---------- */
+  .modal{position:fixed;inset:0;background:rgba(6,9,14,.82);backdrop-filter:blur(4px);
+    display:none;align-items:center;justify-content:center;z-index:50;padding:24px}
+  .modal.on{display:flex}
+  .modal img{max-width:90vw;max-height:86vh;border-radius:12px;box-shadow:var(--shadow)}
+  .dialog{background:var(--panel);border:1px solid var(--line2);border-radius:var(--r);
+    padding:22px;width:min(420px,92vw);box-shadow:var(--shadow)}
+  .dialog h3{margin:0 0 4px;font-size:17px}
+  .dialog p{margin:0 0 16px;color:var(--ink-dim);font-size:13px}
+  .dialog label{display:block;font-size:12px;color:var(--ink-dim);margin:12px 0 5px;
+    font-weight:600}
+  .dialog input,.dialog textarea{width:100%;background:var(--bg2);border:1px solid var(--line2);
+    border-radius:9px;padding:10px 12px;font-size:13px;outline:none}
+  .dialog textarea{resize:vertical;min-height:70px}
+  .dialog .btns{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+  .toast{position:fixed;bottom:74px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:11px 18px;
+    font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.22s;z-index:60}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.err{border-color:var(--bad);color:#ffd9d9}
+  /* ---------- topbar: resources + machine controls ---------- */
+  .topbar{grid-column:1/3;grid-row:1/2;display:flex;align-items:center;gap:14px;
+    padding:8px 18px;background:var(--bg2);border-bottom:1px solid var(--line);
+    min-height:46px;flex-wrap:wrap}
+  .meters{display:flex;align-items:center;gap:14px;flex-wrap:wrap;min-width:0}
+  .meter{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink-dim);
+    cursor:default}
+  .meter .mlbl{font-weight:650;letter-spacing:.4px;text-transform:uppercase;
+    font-size:10px;color:var(--ink-faint);flex:none;width:34px}
+  .meter .bar{width:78px;height:8px;border-radius:20px;background:var(--line);
+    overflow:hidden;flex:none}
+  .meter .fill{height:100%;border-radius:20px;transition:width .4s,background .3s;
+    background:var(--good)}
+  .meter .fill.amber{background:var(--warn)} .meter .fill.red{background:var(--bad)}
+  .meter .mval{font-variant-numeric:tabular-nums;min-width:30px;flex:none;color:var(--ink-dim)}
+  .meter.gpuoff .mval{color:var(--ink-faint);font-style:italic}
+  .topbar .spacer{flex:1;min-width:8px}
+  .mach{display:flex;align-items:center;gap:8px;flex:none}
+  .mbtn{padding:7px 12px;border-radius:20px;background:var(--panel2);
+    border:1px solid var(--line2);font-size:12px;font-weight:600;color:var(--ink);
+    display:inline-flex;align-items:center;gap:6px;transition:background .12s;min-height:32px}
+  .mbtn:hover{background:var(--chip)} .mbtn:disabled{opacity:.45;cursor:not-allowed}
+  .mbtn.warn{border-color:var(--warn);color:var(--warn)}
+  .mbtn.stop{border-color:var(--bad);color:var(--bad)}
+  .mbtn .glyph{font-size:12px;line-height:1}
+  .iconround{width:34px;height:34px;border-radius:50%;flex:none;display:flex;
+    align-items:center;justify-content:center;background:var(--panel2);
+    border:1px solid var(--line2);color:var(--ink-dim);font-size:15px;
+    transition:background .12s,color .12s}
+  .iconround:hover{background:var(--chip);color:var(--ink)}
+  .resdetail{grid-column:1/3;grid-row:2/3;background:var(--bg2);
+    border-bottom:1px solid var(--line);
+    padding:12px 18px;display:none;font-size:12px;color:var(--ink-dim);gap:24px;
+    flex-wrap:wrap}
+  .resdetail.on{display:flex}
+  .resdetail .rd{display:flex;flex-direction:column;gap:2px}
+  .resdetail .rd b{color:var(--ink);font-weight:600;font-size:13px}
+  /* ---------- doctor banner ---------- */
+  .doctor{grid-column:1/3;grid-row:3/4;background:var(--bg2);
+    border-bottom:1px solid var(--line);padding:0 18px;display:none}
+  .doctor.on{display:block}
+  .doctor .dinner{padding:14px 0;display:flex;flex-direction:column;gap:10px}
+  .doctor .dhead{display:flex;align-items:center;gap:10px}
+  .doctor .dhead h4{margin:0;font-size:14px;font-weight:650}
+  .doctor .dhead .sub{color:var(--ink-dim);font-size:12px}
+  .doctor .dhead .grow{flex:1}
+  .doctor.okpill{padding:6px 18px}
+  .doctor .okrow{display:flex;align-items:center;gap:9px;padding:7px 0;font-size:12.5px;
+    color:var(--ink-dim)}
+  .okpilldot{width:9px;height:9px;border-radius:50%;background:var(--good);
+    box-shadow:0 0 8px var(--good);flex:none}
+  .dcheck{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;
+    border-radius:var(--r-sm);background:var(--panel);border:1px solid var(--line)}
+  .dcheck .mark{flex:none;width:20px;height:20px;border-radius:50%;display:flex;
+    align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .dcheck.ok .mark{background:rgba(74,222,128,.15);color:var(--good)}
+  .dcheck.no .mark{background:rgba(248,113,113,.15);color:var(--bad)}
+  .dcheck .body{min-width:0}
+  .dcheck .cn{font-weight:600;font-size:13px}
+  .dcheck .dt{color:var(--ink-dim);font-size:12px;margin-top:2px}
+  .dcheck .fx{color:var(--accent);font-size:12px;margin-top:4px}
+  .dclose{background:transparent;color:var(--ink-faint);font-size:18px;padding:2px 8px;
+    border-radius:6px} .dclose:hover{color:var(--ink);background:var(--line)}
+  /* ---------- queue panel (expanded) ---------- */
+  .qtop{display:flex;align-items:center;gap:12px;flex:none}
+  .qtop .qcount{background:var(--accent);color:var(--on-accent);font-weight:700;
+    font-size:11px;padding:2px 9px;border-radius:20px;min-width:20px;text-align:center}
+  .qtop .qcount.idle{background:var(--line2);color:var(--ink-dim)}
+  .qtoggle{margin-left:auto;background:transparent;color:var(--ink-dim);font-size:12px;
+    font-weight:600;padding:6px 10px;border-radius:7px;display:inline-flex;gap:6px;
+    align-items:center;flex:none} .qtoggle:hover{background:var(--panel);color:var(--ink)}
+  .qtoggle .car{transition:transform .15s;font-size:10px} .qtoggle.open .car{transform:rotate(180deg)}
+  .qbtn{background:var(--panel);border:1px solid var(--line);color:var(--ink-dim);
+    font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;flex:none}
+  .qbtn:hover{background:var(--panel2);color:var(--ink)}
+  .qpanel{grid-column:2/3;grid-row:6/7;background:var(--bg2);border-top:1px solid var(--line);
+    max-height:0;overflow:hidden;transition:max-height .2s}
+  .qpanel.on{max-height:300px;overflow-y:auto}
+  .qlist{padding:6px 20px 14px;display:flex;flex-direction:column;gap:7px}
+  .qrow{display:flex;align-items:center;gap:11px;background:var(--panel);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 12px;font-size:12.5px}
+  .qrow .qk{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);
+    background:var(--chip);padding:2px 7px;border-radius:20px;flex:none}
+  .qrow .qa{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qrow .qgrow{flex:1;min-width:0}
+  .pill{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;flex:none;
+    text-transform:uppercase;letter-spacing:.4px;display:inline-flex;align-items:center;gap:5px}
+  .pill.running{background:rgba(110,168,254,.16);color:var(--accent)}
+  .pill.queued{background:rgba(251,191,36,.16);color:var(--warn)}
+  .pill.done{background:rgba(74,222,128,.16);color:var(--good)}
+  .pill.error{background:rgba(248,113,113,.16);color:var(--bad)}
+  .pill.cancelled{background:var(--chip);color:var(--ink-faint)}
+  .qrow .qtries{color:var(--ink-faint);font-size:11px;flex:none}
+  .qcancel{background:transparent;border:1px solid var(--line2);color:var(--ink-dim);
+    font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;flex:none}
+  .qcancel:hover{border-color:var(--bad);color:var(--bad)}
+  .qpanelempty{color:var(--ink-faint);font-size:12.5px;text-align:center;padding:16px}
+  /* ---------- brief disclosure ---------- */
+  .disc{margin-top:14px}
+  .disc summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--ink-dim);
+    list-style:none;display:inline-flex;align-items:center;gap:7px;padding:6px 2px;
+    user-select:none}
+  .disc summary::-webkit-details-marker{display:none}
+  .disc summary .car{font-size:10px;transition:transform .15s}
+  .disc[open] summary .car{transform:rotate(90deg)}
+  .disc summary:hover{color:var(--ink)}
+  .briefbox{margin-top:10px;background:var(--bg2);border:1px solid var(--line);
+    border-radius:var(--r-sm);padding:13px 15px;font-size:12.5px;color:var(--ink-dim);
+    line-height:1.6}
+  .briefbox .bk{color:var(--ink-faint);text-transform:uppercase;letter-spacing:.5px;
+    font-size:10px;font-weight:650;margin-top:11px}
+  .briefbox .bk:first-child{margin-top:0}
+  .briefbox .bv{color:var(--ink);margin-top:2px;white-space:pre-wrap}
+  .histlog{margin-top:10px;display:flex;flex-direction:column;gap:6px;max-height:220px;
+    overflow-y:auto}
+  .histlog .hmsg{font-size:12px;padding:7px 10px;border-radius:8px;background:var(--panel2);
+    border:1px solid var(--line)}
+  .histlog .hmsg .hr{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;
+    color:var(--ink-faint);font-weight:650;margin-bottom:2px}
+  /* ---------- settings slide-over ---------- */
+  .sheet{position:fixed;inset:0;background:rgba(6,9,14,.6);backdrop-filter:blur(3px);
+    display:none;z-index:70}
+  .sheet.on{display:block}
+  .sheet .panel{position:absolute;top:0;right:0;bottom:0;width:min(520px,96vw);
+    background:var(--panel);border-left:1px solid var(--line2);box-shadow:var(--shadow);
+    display:flex;flex-direction:column;transform:translateX(20px);opacity:0;
+    transition:transform .2s,opacity .2s}
+  .sheet.on .panel{transform:translateX(0);opacity:1}
+  .sheet .shead{display:flex;align-items:center;gap:10px;padding:18px 22px;
+    border-bottom:1px solid var(--line);flex:none}
+  .sheet .shead h3{margin:0;font-size:17px;font-weight:650;flex:1}
+  .sheet .sbody{overflow-y:auto;padding:8px 22px 22px;flex:1}
+  .sgroup{margin-top:20px}
+  .sgroup h4{font-size:11px;text-transform:uppercase;letter-spacing:.7px;
+    color:var(--ink-faint);font-weight:650;margin:0 0 4px;padding-bottom:7px;
+    border-bottom:1px solid var(--line)}
+  .sfield{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .sfield:last-child{border-bottom:none}
+  .sfield .sf-l{flex:1;min-width:0}
+  .sfield .sf-l .sf-n{font-size:13px;font-weight:600;color:var(--ink)}
+  .sfield .sf-l .sf-h{font-size:11.5px;color:var(--ink-faint);margin-top:1px}
+  .sfield .sf-c{flex:none;display:flex;align-items:center;gap:8px}
+  .sfield input[type=number],.sfield input[type=text],.sfield select{
+    background:var(--bg2);border:1px solid var(--line2);border-radius:8px;
+    padding:8px 10px;font-size:13px;color:var(--ink);outline:none;width:120px}
+  .sfield input[type=text]{width:170px}
+  .sfield input:focus,.sfield select:focus{border-color:var(--accent)}
+  .snote{background:var(--bg2);border:1px solid var(--line);border-radius:9px;
+    padding:11px 13px;margin-top:16px;font-size:12px;color:var(--ink-dim);line-height:1.5}
+  .seg{display:inline-flex;background:var(--bg2);border:1px solid var(--line2);
+    border-radius:8px;overflow:hidden}
+  .seg button{padding:7px 12px;font-size:12px;font-weight:600;color:var(--ink-dim);
+    background:transparent} .seg button.on{background:var(--accent);color:var(--on-accent)}
+  /* ---------- help overlay ---------- */
+  .helpwrap{position:fixed;inset:0;z-index:90;display:none}
+  .helpwrap.on{display:block}
+  .helpdim{position:absolute;inset:0;background:rgba(6,9,14,.72);
+    backdrop-filter:blur(1px)}
+  .helphole{position:absolute;border:2px solid var(--accent);border-radius:10px;
+    box-shadow:0 0 0 3px rgba(110,168,254,.25);pointer-events:none;transition:.15s}
+  .helpcall{position:absolute;max-width:230px;background:var(--panel);
+    border:1px solid var(--line2);border-radius:10px;padding:11px 13px;
+    box-shadow:var(--shadow);font-size:12.5px;line-height:1.5;color:var(--ink-dim)}
+  .helpcall b{color:var(--ink);display:block;font-size:13px;margin-bottom:3px}
+  .helphint{position:fixed;top:16px;left:50%;transform:translateX(-50%);
+    background:var(--panel);border:1px solid var(--line2);border-radius:20px;
+    padding:9px 18px;font-size:13px;font-weight:600;box-shadow:var(--shadow);z-index:91}
+  .helpbtn{position:fixed;bottom:20px;right:20px;width:46px;height:46px;border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0b1220;
+    font-size:22px;font-weight:700;box-shadow:0 6px 18px rgba(110,168,254,.4);z-index:45;
+    display:flex;align-items:center;justify-content:center}
+  .helpbtn:hover{transform:translateY(-2px)}
+  .badge-dot{position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;
+    background:var(--good);border:2px solid var(--bg2)}
+  /* ---------- surprise-me / explore ---------- */
+  .surprisebtn{margin:0 14px 12px;padding:10px 14px;border-radius:var(--r-sm);
+    background:var(--panel2);border:1px solid var(--line2);font-weight:600;font-size:13px;
+    color:var(--ink);display:flex;align-items:center;justify-content:center;gap:8px;
+    transition:background .12s,transform .12s}
+  .surprisebtn:hover{background:var(--chip);transform:translateY(-1px)}
+  .surprisebtn .spark{font-size:14px}
+  .explorebar{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+    padding:18px;box-shadow:var(--shadow);margin-bottom:20px}
+  .explorebar h3{margin:0 0 4px;font-size:18px;font-weight:650}
+  .explorebar .sub{color:var(--ink-dim);font-size:13px;margin:0 0 14px}
+  .explorebar .bigin{width:100%;background:var(--bg2);border:1px solid var(--line2);
+    border-radius:10px;padding:13px 15px;font-size:15px;outline:none;transition:border-color .12s}
+  .explorebar .bigin:focus{border-color:var(--accent)}
+  .explorerow{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-top:14px}
+  .explorerow .fld{display:flex;flex-direction:column;gap:5px}
+  .explorerow .fld label{font-size:11px;text-transform:uppercase;letter-spacing:.6px;
+    color:var(--ink-faint);font-weight:650}
+  .explorerow .fld input[type=number]{width:82px;background:var(--bg2);
+    border:1px solid var(--line2);border-radius:9px;padding:9px 11px;font-size:13px;
+    color:var(--ink);outline:none}
+  .explorerow .fld select{min-width:170px}
+  .explorerow .grow{flex:1;min-width:8px}
+  .explorerow .go{padding:12px 20px;border-radius:var(--r-sm);
+    background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0b1220;
+    font-weight:650;font-size:14px;display:inline-flex;align-items:center;gap:8px;
+    box-shadow:0 4px 14px rgba(110,168,254,.28);transition:transform .12s}
+  .explorerow .go:hover{transform:translateY(-1px)}
+  .explorerow .go:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  /* mood board */
+  .mbhead{display:flex;align-items:flex-start;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+  .mbhead h2{margin:0;font-size:22px;font-weight:650}
+  .mbhead .pmt{color:var(--ink-dim);font-size:13px;margin-top:3px;max-width:600px}
+  .mbhead .actions{margin-left:auto;display:flex;gap:9px;flex-wrap:wrap}
+  .mbprog{font-size:12px;color:var(--ink-dim);margin:0 0 14px;display:flex;
+    align-items:center;gap:9px}
+  .mbdown{background:var(--bg2);border:1px solid var(--warn);border-radius:9px;
+    padding:11px 14px;margin:0 0 16px;font-size:12.5px;color:var(--ink-dim);line-height:1.55}
+  .mbgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+  .mbtile{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .12s}
+  .mbtile.picked{outline:2px solid var(--accent);outline-offset:-2px}
+  .mbtile.skipped{opacity:.7}
+  .mbtile .pic{position:relative;aspect-ratio:1;background:var(--bg2);display:flex;
+    align-items:center;justify-content:center;overflow:hidden}
+  .mbtile .pic img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+  .mbtile .pic .load{display:flex;flex-direction:column;align-items:center;gap:9px;
+    color:var(--ink-faint);font-size:11px}
+  .mbtile .pic .skip{color:var(--ink-faint);font-size:12px;padding:12px;text-align:center}
+  .mbtile .pchk{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;
+    background:rgba(14,17,22,.72);backdrop-filter:blur(3px);color:#fff;font-size:15px;
+    display:flex;align-items:center;justify-content:center;border:1px solid var(--line2);
+    transition:background .12s}
+  .mbtile.picked .pchk{background:var(--accent);color:#0b1220;border-color:transparent}
+  .mbtile .cap{padding:11px 12px;display:flex;flex-direction:column;gap:8px}
+  .mbtile .cap .lbl{font-weight:600;font-size:13px;line-height:1.35}
+  .mbtile .cap textarea{width:100%;background:var(--bg2);border:1px solid var(--line2);
+    border-radius:8px;padding:8px 10px;font-size:12px;resize:vertical;min-height:34px;
+    outline:none;transition:border-color .12s;display:none}
+  .mbtile.picked .cap textarea{display:block}
+  .mbtile .cap textarea:focus{border-color:var(--accent)}
+  .mbstick{position:sticky;bottom:0;margin-top:18px;background:var(--panel2);
+    border:1px solid var(--line2);border-radius:var(--r);padding:14px 16px;
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:var(--shadow);z-index:5}
+  .mbstick .pcount{font-size:13px;color:var(--ink-dim);flex:1;min-width:8px}
+  .mbstick .pcount b{color:var(--ink)}
+  .synthcard{background:var(--panel);border:1px solid var(--accent);border-radius:var(--r);
+    padding:18px;margin-top:18px;box-shadow:var(--shadow)}
+  .synthcard h3{margin:0 0 6px;font-size:14px;font-weight:650}
+  .synthcard .slbl{font-weight:650;font-size:15px;color:var(--ink)}
+  .synthcard .sprompt{color:var(--ink-dim);font-size:13px;margin:8px 0 16px;line-height:1.55;
+    white-space:pre-wrap}
+  .synthcard .btns{display:flex;gap:10px;flex-wrap:wrap}
+  @media(max-width:720px){
+    .app{grid-template-columns:1fr;
+      grid-template-rows:auto auto auto auto 1fr auto auto}
+    .topbar{grid-column:1/2;grid-row:1/2}
+    .resdetail{grid-column:1/2;grid-row:2/3}
+    .doctor{grid-column:1/2;grid-row:3/4}
+    .rail{grid-column:1/2;grid-row:4/5;border-right:none;
+      border-bottom:1px solid var(--line);max-height:38vh}
+    .assets{max-height:26vh}
+    .main{grid-column:1/2;grid-row:5/6}
+    .queue{grid-column:1/2;grid-row:6/7}
+    .qpanel{grid-column:1/2;grid-row:7/8}
+    .meter .bar{width:56px} .helpcall{max-width:180px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- TOPBAR: resources + machine controls -->
+  <header class="topbar" data-help="resources" id="topbar">
+    <div class="meters" id="meters" title="Live load on this computer">
+      <div class="meter" id="mCpu"><span class="mlbl">CPU</span>
+        <span class="bar"><span class="fill" id="fCpu" style="width:0%"></span></span>
+        <span class="mval" id="vCpu">--</span></div>
+      <div class="meter" id="mRam"><span class="mlbl">RAM</span>
+        <span class="bar"><span class="fill" id="fRam" style="width:0%"></span></span>
+        <span class="mval" id="vRam">--</span></div>
+      <div class="meter" id="mGpu"><span class="mlbl">GPU</span>
+        <span class="bar"><span class="fill" id="fGpu" style="width:0%"></span></span>
+        <span class="mval" id="vGpu">--</span></div>
+      <div class="meter" id="mVram"><span class="mlbl">VRAM</span>
+        <span class="bar"><span class="fill" id="fVram" style="width:0%"></span></span>
+        <span class="mval" id="vVram">--</span></div>
+    </div>
+    <button class="iconround" id="resExpand" title="Show resource details"
+      onclick="toggleResDetail()">&#9662;</button>
+    <div class="spacer"></div>
+    <div class="mach">
+      <button class="mbtn" id="pauseBtn" onclick="toggleQueuePause()"
+        title="Stop starting new work so you can use your computer">
+        <span class="glyph">&#10073;&#10073;</span><span id="pauseTxt">Pause queue</span></button>
+      <button class="mbtn stop" id="stopBtn" onclick="stopGen()"
+        title="Interrupt the picture being made right now">
+        <span class="glyph">&#9632;</span> Stop gen</button>
+      <button class="iconround" id="settingsBtn" title="Settings"
+        onclick="openSettings()">&#9881;</button>
+    </div>
+  </header>
+  <!-- RESOURCE DETAIL (expandable) -->
+  <div class="resdetail" id="resdetail"></div>
+  <!-- DOCTOR / HEALTH BANNER -->
+  <section class="doctor" data-help="doctor" id="doctor"></section>
+
+  <!-- LEFT RAIL -->
+  <aside class="rail" data-help="tree">
+    <div class="brand">
+      <span class="dot"></span>
+      <div><h1>Art Conductor</h1><small>your studio, one place</small></div>
+    </div>
+    <button class="newbtn" data-help="newhero" onclick="openNew()">+ New hero</button>
+    <button class="surprisebtn" data-help="explore" onclick="openExplore()">
+      <span class="spark">&#10024;</span> Surprise me</button>
+    <div class="assets" id="assets">
+      <div class="treehead">
+        <span class="lbl">Categories</span>
+        <button class="addcat" onclick="openCatNew('')">+ Category</button>
+      </div>
+      <div id="tree"></div>
+    </div>
+    <div class="brainbar" id="brainbar">
+      <span class="b" id="brainDot"></span>
+      <span id="brainTxt">checking local brain...</span>
+    </div>
+  </aside>
+
+  <!-- CENTER -->
+  <main class="main" id="main" data-help="gallery"></main>
+
+  <!-- QUEUE STRIP + PANEL -->
+  <section class="queue" data-help="queue" id="queue">
+    <div class="qtop">
+      <span class="lbl">Queue</span>
+      <span class="qcount idle" id="qcount">0</span>
+    </div>
+    <span class="qempty" id="qempty">Nothing running. Describe a hero to kick things off.</span>
+    <button class="qbtn" id="qclearBtn" onclick="clearFinished()"
+      style="display:none">Clear finished</button>
+    <button class="qtoggle" id="qtoggle" onclick="toggleQPanel()">
+      <span id="qtoggleTxt">Details</span><span class="car">&#9660;</span></button>
+  </section>
+  <div class="qpanel" id="qpanel"><div class="qlist" id="qlist"></div></div>
+</div>
+
+<!-- SETTINGS SLIDE-OVER -->
+<div class="sheet" id="settings" data-help="settings" onclick="if(event.target===this)closeSettings()">
+  <div class="panel">
+    <div class="shead">
+      <h3>Settings</h3>
+      <button class="iconround" onclick="closeSettings()" title="Close">&#10005;</button>
+    </div>
+    <div class="sbody" id="settingsBody">
+      <div class="empty" style="height:auto;padding:40px 0"><div class="spin"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- HELP OVERLAY -->
+<div class="helpwrap" id="helpwrap" onclick="exitHelp()">
+  <div class="helpdim"></div>
+</div>
+<button class="helpbtn" id="helpbtn" title="What is all this? (guided tour)"
+  onclick="enterHelp()">?</button>
+
+<!-- modals -->
+<div class="modal" id="lightbox" onclick="closeLight()"><img id="lightimg" alt="" /></div>
+<div class="modal" id="newmodal">
+  <div class="dialog" onclick="event.stopPropagation()">
+    <h3>New hero</h3>
+    <p>Give it a short name and describe what you want to see.</p>
+    <label>Name</label>
+    <input id="newName" placeholder="frost-warden" autocomplete="off" />
+    <label>Describe your hero</label>
+    <textarea id="newPrompt" placeholder="a grizzled ice knight, glowing blue armor, painterly, dramatic light"></textarea>
+    <label>Category</label>
+    <select id="newCategory"></select>
+    <div class="btns">
+      <button class="btn" onclick="closeNew()">Cancel</button>
+      <button class="btn primary" onclick="submitNew()">Create</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="catnewmodal">
+  <div class="dialog" onclick="event.stopPropagation()">
+    <h3 id="catnewTitle">New category</h3>
+    <p id="catnewSub">Name a category. Everything inside inherits its style unless it overrides it.</p>
+    <label>Name</label>
+    <input id="catnewName" placeholder="Frost Faction" autocomplete="off" />
+    <div class="btns">
+      <button class="btn" onclick="closeCatNew()">Cancel</button>
+      <button class="btn primary" onclick="submitCatNew()">Create</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="cateditmodal">
+  <div class="dialog catform" onclick="event.stopPropagation()" style="width:min(460px,94vw)">
+    <h3 id="cateditTitle">Category settings</h3>
+    <p class="helper" style="margin-bottom:0">Everything inside inherits these unless it overrides them.</p>
+    <label>Style prompt</label>
+    <textarea id="catStyle" placeholder="cohesive palette, painterly, dramatic rim light"></textarea>
+    <label>Avoid (negative)</label>
+    <textarea id="catNegative" placeholder="text, watermark, blurry"></textarea>
+    <label>Reference set</label>
+    <input id="catRefSet" placeholder="defaults to the category path" autocomplete="off" />
+    <label>Reference weight (0 to 1, blank inherits)</label>
+    <input id="catWeight" type="number" min="0" max="1" step="0.05" placeholder="inherit" />
+    <label>Note</label>
+    <textarea id="catNote" placeholder="anything to remember about this category"></textarea>
+    <div class="refhint" id="catRefHint"></div>
+    <div class="btns">
+      <button class="btn" onclick="closeCatEdit()">Cancel</button>
+      <button class="btn primary" onclick="submitCatEdit()">Save</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="catdelmodal">
+  <div class="dialog" onclick="event.stopPropagation()">
+    <h3>Delete category</h3>
+    <p id="catdelSub">Delete this category?</p>
+    <div class="btns" style="flex-wrap:wrap">
+      <button class="btn" onclick="closeCatDel()">Cancel</button>
+      <button class="btn" onclick="submitCatDel(false)">Keep contents (move up)</button>
+      <button class="btn primary" style="background:linear-gradient(135deg,var(--bad),#b91c1c)" onclick="submitCatDel(true)">Delete everything inside</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="exploremodal">
+  <div class="dialog" onclick="event.stopPropagation()" style="width:min(480px,94vw)">
+    <h3>&#10024; Surprise me</h3>
+    <p>Type a vague, evocative idea. The studio spins it into many wildly different takes so you can cherry-pick the parts you like.</p>
+    <label>Your idea</label>
+    <input id="exPhrase" placeholder="Dark Steampunk Heavy Vampire Diamond" autocomplete="off" onkeydown="if(event.key==='Enter')submitExplore()" />
+    <label>How many takes</label>
+    <input id="exCount" type="number" min="4" max="20" value="10" />
+    <label>Into category (optional)</label>
+    <select id="exCategory"></select>
+    <div class="btns">
+      <button class="btn" onclick="closeExplore()">Cancel</button>
+      <button class="btn primary" onclick="submitExplore()">Surprise me</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = (s,r=document)=>r.querySelector(s);
+const api = (p,opt)=>fetch(p,opt).then(async r=>{
+  const j = await r.json().catch(()=>({error:"bad response"}));
+  if(!r.ok) throw new Error(j.error||("HTTP "+r.status));
+  return j;
+});
+let STATE = {assets:[], queue:[], brain:{}};
+let CATTREE = [];       // category tree from /api/categories
+let CUR = null;         // selected asset name
+let CURDATA = null;     // full asset payload
+let CURCAT = null;      // selected category path (settings panel)
+let autoGen = false;
+const OPEN = {};        // path -> expanded?  (default open)
+let catEditPath = null, catDelPath = null, catNewParent = "";
+let queuePaused = false;    // reflected from /api/resources or /api/queue toggle
+let SETTINGS = {};          // last-loaded backend settings (flat dotted keys)
+
+/* ---------------- client-side prefs (localStorage) ---------------- */
+const PREF_DEFAULTS = {theme:"dark", motion:"auto", confirmDelete:true, notify:true};
+function loadPrefs(){
+  let p={}; try{ p=JSON.parse(localStorage.getItem("ac_prefs")||"{}"); }catch(e){ p={}; }
+  return Object.assign({}, PREF_DEFAULTS, p);
+}
+let PREFS = loadPrefs();
+function savePrefs(){ try{ localStorage.setItem("ac_prefs",JSON.stringify(PREFS)); }catch(e){} }
+function systemDark(){
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function systemReduce(){
+  return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+function applyTheme(){
+  const root=document.documentElement;
+  let t=PREFS.theme;
+  if(t==="system") t = systemDark()?"dark":"light";
+  if(t==="light") root.setAttribute("data-theme","light");
+  else root.removeAttribute("data-theme");
+  const reduce = PREFS.motion==="reduce" || (PREFS.motion==="auto" && systemReduce());
+  if(reduce) root.setAttribute("data-motion","reduce");
+  else root.removeAttribute("data-motion");
+}
+if(window.matchMedia){
+  const md=window.matchMedia("(prefers-color-scheme: dark)");
+  (md.addEventListener?md.addEventListener.bind(md,"change"):md.addListener.bind(md))(()=>{
+    if(PREFS.theme==="system") applyTheme();
+  });
+}
+
+/* flatten the tree to an ordered list of {path,name,settings,depth} */
+function flatCats(nodes, depth=0, out=[]){
+  (nodes||[]).forEach(n=>{
+    out.push({path:n.path, name:n.name, settings:n.settings||{}, depth});
+    flatCats(n.children, depth+1, out);
+  });
+  return out;
+}
+function findCat(path, nodes=CATTREE){
+  for(const n of nodes){
+    if(n.path===path) return n;
+    const hit=findCat(path, n.children||[]);
+    if(hit) return hit;
+  }
+  return null;
+}
+async function refreshCats(){
+  try{ const r=await api("/api/categories"); CATTREE=r.tree||[]; }
+  catch(e){ CATTREE=[]; }
+}
+
+function toast(msg, err){
+  const t=$("#toast"); t.textContent=msg; t.className="toast on"+(err?" err":"");
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.className="toast",2600);
+}
+
+/* ---------------- state + rail ---------------- */
+async function refreshState(){
+  try{ STATE = await api("/api/state"); }catch(e){ return; }
+  await refreshCats();
+  renderRail(); renderBrain();
+  if(CUR && !STATE.assets.some(a=>a.name===CUR)){ CUR=null; CURDATA=null; renderMain(); }
+}
+function renderBrain(){
+  const b=STATE.brain||{}; const dot=$("#brainDot"), txt=$("#brainTxt");
+  dot.className="b "+(b.ok?"ok":"no");
+  txt.textContent = b.detail || (b.ok?"brain ready":"brain offline");
+}
+function assetHTML(a){
+  const sel = a.name===CUR ? " sel":"";
+  const dot = a.chosen?"chosen":(a.candidateCount?"cands":"");
+  const thumb = a.thumb
+    ? `<img class="thumb" src="${a.thumb}" alt="" />`
+    : `<div class="thumb ph">?</div>`;
+  const sub = a.chosen ? "winner picked"
+    : (a.candidateCount ? a.candidateCount+" candidates" : "no candidates yet");
+  return `<button class="asset${sel}" onclick="selectAsset('${esc(a.name)}')">
+    ${thumb}
+    <div class="meta"><div class="nm">${esc(a.name)}</div><div class="sub">${sub}</div></div>
+    <span class="sdot ${dot}"></span>
+  </button>`;
+}
+function assetsFor(path){
+  return STATE.assets.filter(a=>(a.category||null)===(path||null));
+}
+function subtreeCount(node){
+  let n=assetsFor(node.path).length;
+  (node.children||[]).forEach(c=>n+=subtreeCount(c));
+  return n;
+}
+function nodeHTML(node){
+  const kids=node.children||[];
+  const open = OPEN[node.path]!==false;
+  const direct = assetsFor(node.path);
+  const hasContent = kids.length || direct.length;
+  const sel = node.path===CURCAT ? " sel":"";
+  const twist = hasContent
+    ? `<button class="twist${open?" open":""}" onclick="toggleNode('${esc(node.path)}')">&#9654;</button>`
+    : `<button class="twist leaf">&#9654;</button>`;
+  const total = subtreeCount(node);
+  let inner="";
+  if(open){
+    inner = `<div class="kids">
+      ${kids.map(nodeHTML).join("")}
+      ${direct.map(assetHTML).join("")}
+    </div>`;
+  }
+  return `<div class="node">
+    <div class="noderow${sel}">
+      ${twist}
+      <button class="cname" onclick="selectCat('${esc(node.path)}')">
+        <span class="ico">&#128193;</span>${esc(node.name)}
+        <span class="cnt">${total}</span>
+      </button>
+      <div class="nodeacts">
+        <button class="iconbtn" title="Add subcategory" onclick="openCatNew('${esc(node.path)}')">&#43;</button>
+        <button class="iconbtn" title="Edit settings" onclick="openCatEdit('${esc(node.path)}')">&#9998;</button>
+        <button class="iconbtn danger" title="Delete" onclick="openCatDel('${esc(node.path)}')">&#128465;</button>
+      </div>
+    </div>
+    ${inner}
+  </div>`;
+}
+function toggleNode(path){ OPEN[path]=(OPEN[path]===false); renderRail(); }
+function renderRail(){
+  const box=$("#tree");
+  if(!box) return;
+  const uncat=assetsFor(null);
+  let html=CATTREE.map(nodeHTML).join("");
+  if(uncat.length){
+    html+=`<div class="grouphdr">Uncategorized</div>${uncat.map(assetHTML).join("")}`;
+  }
+  if(!CATTREE.length && !STATE.assets.length){
+    html='<div style="color:var(--ink-faint);font-size:12.5px;padding:14px 8px;line-height:1.6">'
+      +'No categories yet. Hit <b style="color:var(--ink-dim)">+ Category</b> to group your work, '
+      +'or <b style="color:var(--ink-dim)">+ New hero</b> to make your first one.</div>';
+  }
+  box.innerHTML=html;
+}
+
+/* ---------------- selection + center ---------------- */
+async function selectAsset(name){
+  CUR=name; CURCAT=null; renderRail();
+  $("#main").innerHTML='<div class="empty"><div class="spin"></div><p>Loading '+esc(name)+'...</p></div>';
+  try{ CURDATA = await api("/api/asset?name="+encodeURIComponent(name)); }
+  catch(e){ toast(e.message,true); return; }
+  if(CURDATA && CURDATA.category===undefined){
+    const st=STATE.assets.find(a=>a.name===name);
+    CURDATA.category = st ? (st.category||null) : null;
+  }
+  renderMain();
+}
+function catOptions(selected){
+  const cats=flatCats(CATTREE);
+  const opts=['<option value="">Uncategorized</option>'];
+  cats.forEach(c=>{
+    const indent="  ".repeat(c.depth);
+    const sel=(selected||"")===c.path?" selected":"";
+    opts.push(`<option value="${esc(c.path)}"${sel}>${indent}${esc(c.name)}</option>`);
+  });
+  return opts.join("");
+}
+function renderMain(){
+  const m=$("#main");
+  if(MOOD){ renderMoodBoard(); return; }
+  if(CURCAT){ renderCatPanel(); return; }
+  if(!CUR||!CURDATA){
+    m.innerHTML=`<div class="empty">
+      <div class="big">&#127912;</div>
+      <h2>Welcome to your studio</h2>
+      <p>Pick a hero on the left, or create a new one. Describe what you want, watch the
+         candidates roll in, pick your favorite, then vectorize it. That is the whole loop.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+        <button class="btn primary" onclick="openExplore()">&#10024; Surprise me with styles</button>
+        <button class="btn" onclick="openNew()">+ New hero</button>
+      </div>
+    </div>`;
+    return;
+  }
+  const b=CURDATA.brief||{};
+  const cands=CURDATA.candidates||[];
+  const chosen=CURDATA.chosen;
+  const vec=CURDATA.vector;
+  const canVec = !!chosen;
+
+  const chips = `<div class="chips">
+    <span class="chip"><b>prompt</b> ${esc(b.prompt||"(empty)")}</span>
+    ${b.negative?`<span class="chip neg"><b>avoid</b> ${esc(b.negative)}</span>`:""}
+    <span class="chip"><b>ref weight</b> ${(b.ip_adapter_weight??0.8)}</span>
+    ${b.reference_set?`<span class="chip"><b>refs</b> ${esc(b.reference_set)}</span>`:""}
+    ${CURDATA.category?`<span class="chip"><b>category</b> ${esc(CURDATA.category)}</span>`:""}
+  </div>${briefDisclosure(b)}`;
+
+  const gallery = cands.length ? `<div class="gallery">${cands.map(u=>{
+      const isCh = chosen && (chosen.split("/").pop()===u.split("/").pop() ||
+                   chosen===u);
+      return `<div class="cand${isCh?" chosen":""}">
+        <img src="${u}" alt="" onclick="light('${u}')" />
+        ${isCh?'<span class="badge">WINNER</span>':""}
+        <div class="pick" onclick="pick('${u}')">${isCh?"Chosen":"Pick this"}</div>
+      </div>`;
+    }).join("")}</div>`
+    : `<div class="emptycands">No candidates yet. Send a note below or hit Generate to make some.</div>`;
+
+  const vecCard = `<div class="card" style="margin-top:22px">
+    <h3>Vector</h3>
+    <button class="btn primary" onclick="vectorize()" ${canVec?"":"disabled"}>
+      ${vec?"Re-vectorize":"Vectorize winner"}</button>
+    ${!canVec?'<span style="color:var(--ink-faint);font-size:12px;margin-left:10px">Pick a winner first.</span>':""}
+    ${vec?`<div class="vecwrap"><img src="${vec}?t=${Date.now()}" alt="vector" /></div>`:""}
+  </div>`;
+
+  const chat = renderChat(b);
+
+  m.innerHTML = `
+    <div class="head">
+      <div>
+        <h2>${esc(b.name||CUR)}</h2>
+        <div class="pmt">${esc(b.prompt||"")}</div>
+      </div>
+      <div class="actions">
+        <div class="selrow">
+          <label for="assetCat">Category</label>
+          <select id="assetCat" onchange="assignAsset(this.value)">${catOptions(CURDATA.category)}</select>
+        </div>
+        <button class="btn" onclick="genNow()">&#9889; Generate</button>
+      </div>
+    </div>
+    <div class="grid2">
+      <div>
+        ${chips}
+        <div class="card"><h3>Candidates${CURDATA.latestVersion?" &middot; "+CURDATA.latestVersion:""}</h3>${gallery}</div>
+        ${vecCard}
+      </div>
+      <div class="card chat">
+        <h3>Talk to the conductor</h3>
+        ${chat}
+        <div class="composer">
+          <textarea id="feedback" placeholder="too wizard-y, more evil warlock..."
+            onkeydown="chatKey(event)"></textarea>
+          <div class="row">
+            <label class="toggle">
+              <input type="checkbox" id="autogen" ${autoGen?"checked":""} onchange="autoGen=this.checked">
+              <span class="sw"></span> auto-generate after each note
+            </label>
+            <button class="btn primary" onclick="say()">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  const log=$("#chatlog"); if(log) log.scrollTop=log.scrollHeight;
+}
+function briefDisclosure(b){
+  const chat=b.chat||[];
+  const versions=(CURDATA&&CURDATA.versions)||[];
+  const hist = chat.length ? chat.map(c=>{
+    const role=(c.role==="user"||c.role==="assistant")?c.role:"note";
+    return `<div class="hmsg"><div class="hr">${esc(role)}</div>${esc(c.text||"")}</div>`;
+  }).join("") : '<div class="hmsg" style="color:var(--ink-faint)">No notes yet.</div>';
+  const vers = versions.length
+    ? `<div class="bk">Version snapshots</div><div class="bv">${versions.map(esc).join(", ")}</div>`
+    : "";
+  return `<details class="disc">
+    <summary><span class="car">&#9654;</span> Show full brief and history</summary>
+    <div class="briefbox">
+      <div class="bk">Prompt</div><div class="bv">${esc(b.prompt||"(empty)")}</div>
+      <div class="bk">Avoid (negative)</div><div class="bv">${esc(b.negative||"(none)")}</div>
+      <div class="bk">Reference weight</div><div class="bv">${(b.ip_adapter_weight??0.8)}</div>
+      <div class="bk">Reference set</div><div class="bv">${esc(b.reference_set||"(category default)")}</div>
+      <div class="bk">Category</div><div class="bv">${esc(CURDATA&&CURDATA.category||"Uncategorized")}</div>
+      ${vers}
+      <div class="bk">Conversation history</div>
+      <div class="histlog">${hist}</div>
+    </div>
+  </details>`;
+}
+function renderChat(b){
+  const chat=b.chat||[];
+  if(!chat.length) return '<div class="chatlog" id="chatlog"><div class="chatempty">'
+    +'No notes yet. Tell the conductor what you want and it will tune the brief. '
+    +'Turn on auto-generate to see new candidates each time.</div></div>';
+  return '<div class="chatlog" id="chatlog">'+chat.map(c=>{
+    const role=(c.role==="user"||c.role==="assistant")?c.role:"system";
+    return `<div class="msg ${role}">${esc(c.text||"")}</div>`;
+  }).join("")+'</div>';
+}
+
+/* ---------------- actions ---------------- */
+function chatKey(e){ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();say();} }
+async function say(){
+  const ta=$("#feedback"); if(!ta) return;
+  const fb=ta.value.trim(); if(!fb) return;
+  ta.value=""; ta.disabled=true;
+  // optimistic: show the note immediately
+  const b=CURDATA.brief; (b.chat=b.chat||[]).push({role:"user",text:fb});
+  renderMain();
+  try{
+    const r=await api("/api/say",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name:CUR,feedback:fb,gen:autoGen})});
+    CURDATA.brief=r.brief; renderMain();
+    if(r.job){ toast("Brief updated. Generating candidates..."); }
+    else{ toast("Brief updated."); }
+    refreshState(); pollQueue();
+  }catch(e){ toast(e.message,true); ta.disabled=false; }
+}
+async function genNow(){
+  try{ const r=await api("/api/gen",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({name:CUR})});
+    toast("Queued a fresh batch."); pollQueue();
+  }catch(e){ toast(e.message,true); }
+}
+async function pick(url){
+  try{ await api("/api/pick",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({name:CUR,candidate:url})});
+    toast("Winner picked."); await selectAsset(CUR); refreshState();
+  }catch(e){ toast(e.message,true); }
+}
+async function vectorize(){
+  try{ await api("/api/vector",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({name:CUR})});
+    toast("Vectorizing the winner..."); pollQueue();
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ---------------- new hero ---------------- */
+function openNew(){
+  $("#newmodal").classList.add("on"); $("#newName").value=""; $("#newPrompt").value="";
+  const pre = CURCAT || (CURDATA&&CURDATA.category) || "";
+  $("#newCategory").innerHTML=catOptions(pre);
+  setTimeout(()=>$("#newName").focus(),50);
+}
+function closeNew(){ $("#newmodal").classList.remove("on"); }
+async function submitNew(){
+  const name=$("#newName").value.trim(), prompt=$("#newPrompt").value.trim();
+  const category=$("#newCategory").value;
+  if(!name){ toast("Give it a name.",true); return; }
+  try{
+    await api("/api/new",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name,prompt,category})});
+    closeNew(); await refreshState(); selectAsset(name); toast("Hero created.");
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ---------------- category: settings panel ---------------- */
+function selectCat(path){ CURCAT=path; CUR=null; CURDATA=null; renderRail(); renderMain(); }
+function renderCatPanel(){
+  const m=$("#main");
+  const node=findCat(CURCAT);
+  if(!node){ CURCAT=null; renderMain(); return; }
+  const s=node.settings||{};
+  const refDir="references/"+node.path+"/";
+  m.innerHTML=`
+    <div class="head">
+      <div>
+        <h2>&#128193; ${esc(node.name)}</h2>
+        <div class="pmt">${esc(node.path)}</div>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="openCatNew('${esc(node.path)}')">&#43; Subcategory</button>
+        <button class="btn" onclick="openCatDel('${esc(node.path)}')">Delete</button>
+      </div>
+    </div>
+    <div class="card catform" style="max-width:560px">
+      <h3>Category style</h3>
+      <p class="helper" style="margin-top:-4px">Everything inside inherits these unless it overrides them.</p>
+      <label>Style prompt</label>
+      <textarea id="pStyle" placeholder="cohesive palette, painterly, dramatic rim light">${esc(s.style_prompt||"")}</textarea>
+      <label>Avoid (negative)</label>
+      <textarea id="pNegative" placeholder="text, watermark, blurry">${esc(s.negative||"")}</textarea>
+      <label>Reference set</label>
+      <input id="pRefSet" placeholder="defaults to the category path" value="${esc(s.reference_set||"")}" />
+      <label>Reference weight (0 to 1, blank inherits)</label>
+      <input id="pWeight" type="number" min="0" max="1" step="0.05" placeholder="inherit" value="${s.ip_adapter_weight==null?"":s.ip_adapter_weight}" />
+      <label>Note</label>
+      <textarea id="pNote" placeholder="anything to remember about this category">${esc(s.note||"")}</textarea>
+      <div class="refhint">Reference images live in <code>${esc(refDir)}</code>. Drop this category's style images in that folder.</div>
+      <div class="btns" style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+        <button class="btn primary" onclick="saveCatPanel('${esc(node.path)}')">Save</button>
+      </div>
+    </div>`;
+}
+function readCatForm(pfx){
+  const w=$("#"+pfx+"Weight").value.trim();
+  return {
+    style_prompt:$("#"+pfx+"Style").value,
+    negative:$("#"+pfx+"Negative").value,
+    reference_set:$("#"+pfx+"RefSet").value.trim(),
+    ip_adapter_weight: w===""?null:parseFloat(w),
+    note:$("#"+pfx+"Note").value
+  };
+}
+async function saveCatPanel(path){
+  try{
+    const r=await api("/api/category/update",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({path,settings:readCatForm("p")})});
+    CATTREE=r.tree||CATTREE; toast("Category saved."); renderRail(); renderMain();
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ---------------- category: new ---------------- */
+function openCatNew(parent){
+  catNewParent=parent||"";
+  $("#catnewTitle").textContent = catNewParent ? "New subcategory" : "New category";
+  $("#catnewSub").textContent = catNewParent
+    ? 'Inside "'+catNewParent+'". Everything here inherits its parent unless it overrides.'
+    : "Name a category. Everything inside inherits its style unless it overrides it.";
+  $("#catnewName").value="";
+  $("#catnewmodal").classList.add("on");
+  setTimeout(()=>$("#catnewName").focus(),50);
+}
+function closeCatNew(){ $("#catnewmodal").classList.remove("on"); }
+async function submitCatNew(){
+  const name=$("#catnewName").value.trim();
+  if(!name){ toast("Give it a name.",true); return; }
+  const path = catNewParent ? catNewParent+"/"+name : name;
+  try{
+    const r=await api("/api/category/new",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({path,parent:catNewParent,settings:{}})});
+    CATTREE=r.tree||CATTREE;
+    if(catNewParent) OPEN[catNewParent]=true;
+    closeCatNew(); renderRail(); selectCat(path); toast("Category created.");
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ---------------- category: edit (modal) ---------------- */
+function openCatEdit(path){
+  const node=findCat(path); if(!node){ toast("Category not found.",true); return; }
+  catEditPath=path; const s=node.settings||{};
+  $("#cateditTitle").textContent="Settings: "+node.name;
+  $("#catStyle").value=s.style_prompt||"";
+  $("#catNegative").value=s.negative||"";
+  $("#catRefSet").value=s.reference_set||"";
+  $("#catWeight").value=s.ip_adapter_weight==null?"":s.ip_adapter_weight;
+  $("#catNote").value=s.note||"";
+  $("#catRefHint").innerHTML='Reference images live in <code>references/'+esc(path)
+    +'/</code>. Drop this category\'s style images in that folder.';
+  $("#cateditmodal").classList.add("on");
+}
+function closeCatEdit(){ $("#cateditmodal").classList.remove("on"); }
+async function submitCatEdit(){
+  try{
+    const r=await api("/api/category/update",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({path:catEditPath,settings:readCatForm("cat")})});
+    CATTREE=r.tree||CATTREE; closeCatEdit(); toast("Category saved.");
+    renderRail(); if(CURCAT===catEditPath) renderMain();
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ---------------- category: delete ---------------- */
+function openCatDel(path){
+  catDelPath=path;
+  $("#catdelSub").textContent='Delete "'+path+'"? Keep its heroes and subcategories by moving '
+    +'them up a level, or delete everything inside.';
+  $("#catdelmodal").classList.add("on");
+}
+function closeCatDel(){ $("#catdelmodal").classList.remove("on"); }
+async function submitCatDel(cascade){
+  try{
+    const r=await api("/api/category/delete",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({path:catDelPath,cascade})});
+    CATTREE=r.tree||CATTREE; closeCatDel();
+    if(CURCAT===catDelPath){ CURCAT=null; renderMain(); }
+    await refreshState(); toast("Category deleted.");
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ---------------- assign an asset to a category ---------------- */
+async function assignAsset(category){
+  if(!CUR) return;
+  try{
+    await api("/api/assign",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name:CUR,category})});
+    if(CURDATA) CURDATA.category=category||null;
+    toast(category?"Moved to "+category+".":"Removed from category.");
+    await refreshState();
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ---------------- lightbox ---------------- */
+function light(u){ $("#lightimg").src=u; $("#lightbox").classList.add("on"); }
+function closeLight(){ $("#lightbox").classList.remove("on"); }
+
+/* ---------------- queue polling ---------------- */
+let seenActive=false;
+let prevJobStatus={};     // id -> last status, to detect done transitions per job
+async function pollQueue(){
+  let q;
+  try{ const r=await api("/api/queue"); q=r.queue||[]; }catch(e){ return; }
+  STATE.queue=q;
+
+  // detect newly-completed GEN jobs (per job) for live self-update + notify
+  const doneAssets=new Set();
+  q.forEach(j=>{
+    const id=String(j.id!=null?j.id:(j.asset+"|"+j.kind));
+    const cls=pillClass(j.status);
+    const prev=prevJobStatus[id];
+    if(prev && prev!=="done" && cls==="done"){
+      if((j.kind||"").toLowerCase().indexOf("vec")<0) doneAssets.add(j.asset);
+    }
+    prevJobStatus[id]=cls;
+  });
+  const active=q.some(j=>{const c=pillClass(j.status);return c==="running"||c==="queued";});
+
+  // live update: refetch the open asset + rail whenever something finished
+  if(doneAssets.size){
+    if(CUR && doneAssets.has(CUR)) selectAsset(CUR);
+    refreshState();
+    doneAssets.forEach(a=>notifyBatch(a));
+  } else if(seenActive && !active){
+    // safety net: everything drained (e.g. cancels) - resync once
+    if(CUR) selectAsset(CUR); refreshState();
+  }
+  seenActive=active;
+
+  // ---- strip (compact) ----
+  const strip=$("#queue"), empt=$("#qempty"), clearBtn=$("#qclearBtn");
+  const recent=q.slice(-10).reverse();
+  strip.querySelectorAll(".qjob").forEach(n=>n.remove());
+  const queuedN=q.filter(j=>pillClass(j.status)==="queued").length;
+  const runN=q.filter(j=>pillClass(j.status)==="running").length;
+  const cnt=$("#qcount");
+  const pending=queuedN+runN;
+  cnt.textContent=pending;
+  cnt.className="qcount"+(pending?"":" idle");
+  const finished=q.some(j=>["done","error","cancelled"].includes(pillClass(j.status)));
+  clearBtn.style.display=finished?"":"none";
+  if(!recent.length){ empt.style.display=""; }
+  else{
+    empt.style.display="none";
+    const frag=document.createDocumentFragment();
+    // insert before the toggle button
+    recent.forEach(j=>{
+      const cls=pillClass(j.status);
+      const el=document.createElement("div"); el.className="qjob "+cls;
+      const spin=cls==="running"?'<span class="spin"></span>':"";
+      const tries=(j.tries&&j.tries>1)?`<span class="tries">retry ${j.tries-1}</span>`:"";
+      el.innerHTML=`${spin}<span class="k">${esc(j.kind||"")}</span>
+        <span>${esc(j.asset||"")}</span><span class="st">${esc(j.status||"")}</span>${tries}`;
+      frag.appendChild(el);
+    });
+    strip.insertBefore(frag, clearBtn);
+  }
+  if(qPanelOpen) renderQPanel();
+}
+
+/* ---------------- confirm helper (destructive) ---------------- */
+function confirmDo(msg){ return !PREFS.confirmDelete || window.confirm(msg); }
+
+/* ---------------- resource meters ---------------- */
+function loadClass(pct){ return pct>=90?"red":(pct>=70?"amber":""); }
+function setMeter(fillId, valId, pct, label){
+  const f=$("#"+fillId), v=$("#"+valId);
+  if(!f||!v) return;
+  const p=Math.max(0,Math.min(100,Math.round(pct||0)));
+  f.style.width=p+"%"; f.className="fill "+loadClass(p);
+  v.textContent=label!=null?label:(p+"%");
+}
+function mb(n){ return n==null?"?":(n>=1024?(n/1024).toFixed(1)+" GB":Math.round(n)+" MB"); }
+async function pollResources(){
+  if(document.hidden) return;
+  let r;
+  try{ r=await api("/api/resources"); }catch(e){ return; }
+  // CPU
+  setMeter("fCpu","vCpu", r.cpu_pct==null?0:r.cpu_pct, r.cpu_pct==null?"n/a":Math.round(r.cpu_pct)+"%");
+  // RAM
+  const ram=r.ram||{};
+  setMeter("fRam","vRam", ram.pct==null?0:ram.pct, ram.pct==null?"n/a":Math.round(ram.pct)+"%");
+  // GPU + VRAM
+  const g=r.gpu, mGpu=$("#mGpu"), mVram=$("#mVram");
+  if(g){
+    mGpu.classList.remove("gpuoff");
+    setMeter("fGpu","vGpu", g.util_pct==null?0:g.util_pct,
+      g.util_pct==null?"n/a":Math.round(g.util_pct)+"%");
+    setMeter("fVram","vVram", g.vram_pct==null?0:g.vram_pct,
+      g.vram_pct==null?"n/a":Math.round(g.vram_pct)+"%");
+    const t=g.temp_c!=null?g.temp_c+"C":"";
+    mGpu.title=(g.name||"GPU")+(t?" - "+t:"");
+    mVram.title=(g.name||"GPU")+" VRAM "+mb(g.vram_used_mb)+" / "+mb(g.vram_total_mb);
+  }else{
+    mGpu.classList.add("gpuoff"); mVram.classList.add("gpuoff");
+    setMeter("fGpu","vGpu",0,"CPU only"); setMeter("fVram","vVram",0,"CPU only");
+    mGpu.title="No GPU detected. Generation runs on the CPU (slower).";
+  }
+  if(r.queue_paused!=null) reflectPause(r.queue_paused);
+  RES_LAST=r;
+  if($("#resdetail").classList.contains("on")) renderResDetail();
+}
+let RES_LAST=null;
+function renderResDetail(){
+  const r=RES_LAST; if(!r){ $("#resdetail").innerHTML=""; return; }
+  const ram=r.ram||{}, g=r.gpu, disk=r.disk||{};
+  let html="";
+  html+=`<div class="rd"><span>Processor load</span><b>${r.cpu_pct==null?"n/a":Math.round(r.cpu_pct)+"%"}</b></div>`;
+  html+=`<div class="rd"><span>Memory (RAM)</span><b>${mb(ram.used_mb)} / ${mb(ram.total_mb)}${ram.pct!=null?" ("+Math.round(ram.pct)+"%)":""}</b></div>`;
+  if(g){
+    html+=`<div class="rd"><span>${esc(g.name||"Graphics card")}</span><b>${g.util_pct==null?"n/a":Math.round(g.util_pct)+"% busy"}${g.temp_c!=null?", "+g.temp_c+"C":""}</b></div>`;
+    html+=`<div class="rd"><span>Video memory (VRAM)</span><b>${mb(g.vram_used_mb)} / ${mb(g.vram_total_mb)}</b></div>`;
+  }else{
+    html+=`<div class="rd"><span>Graphics card</span><b>none - running on CPU</b></div>`;
+  }
+  if(disk.total_gb!=null)
+    html+=`<div class="rd"><span>Disk</span><b>${disk.used_gb} / ${disk.total_gb} GB${disk.pct!=null?" ("+Math.round(disk.pct)+"%)":""}</b></div>`;
+  $("#resdetail").innerHTML=html;
+}
+function toggleResDetail(){
+  const d=$("#resdetail"); const on=d.classList.toggle("on");
+  $("#resExpand").innerHTML=on?"&#9652;":"&#9662;";
+  if(on) renderResDetail();
+}
+function reflectPause(paused){
+  queuePaused=!!paused;
+  const btn=$("#pauseBtn"), txt=$("#pauseTxt");
+  if(!btn) return;
+  txt.textContent = queuePaused?"Resume queue":"Pause queue";
+  btn.classList.toggle("warn", queuePaused);
+  btn.querySelector(".glyph").innerHTML = queuePaused?"&#9654;":"&#10073;&#10073;";
+}
+async function toggleQueuePause(){
+  try{
+    const r=await api("/api/queue/"+(queuePaused?"resume":"pause"),{method:"POST"});
+    reflectPause(r.paused);
+    toast(queuePaused?"Queue paused. Nothing new will start.":"Queue resumed.");
+  }catch(e){ toast(e.message,true); }
+}
+async function stopGen(){
+  if(!confirmDo("Stop the picture being made right now?")) return;
+  try{ await api("/api/gen/stop",{method:"POST"}); toast("Stopped the current generation."); pollQueue(); }
+  catch(e){ toast(e.message,true); }
+}
+
+/* ---------------- doctor / health ---------------- */
+let doctorDismissed=false;
+async function runDoctor(){
+  let r;
+  try{ r=await api("/api/doctor"); }catch(e){ return; }
+  const checks=r.checks||[];
+  const failed=checks.filter(c=>!c.ok);
+  const box=$("#doctor");
+  if(!failed.length){
+    box.className="doctor on okpill";
+    box.innerHTML=`<div class="okrow"><span class="okpilldot"></span>
+      <b style="color:var(--good)">All systems ready.</b>
+      <span style="color:var(--ink-faint)">Everything the studio needs is running.</span>
+      <button class="qbtn" style="margin-left:auto" onclick="runDoctor()">Re-check</button></div>`;
+    return;
+  }
+  if(doctorDismissed){ box.className="doctor"; return; }
+  box.className="doctor on";
+  const rows=checks.map(c=>`
+    <div class="dcheck ${c.ok?"ok":"no"}">
+      <span class="mark">${c.ok?"&#10003;":"&#10005;"}</span>
+      <div class="body">
+        <div class="cn">${esc(c.name)}</div>
+        ${c.detail?`<div class="dt">${esc(c.detail)}</div>`:""}
+        ${(!c.ok&&c.fix)?`<div class="fx">&#128161; ${esc(c.fix)}</div>`:""}
+      </div>
+    </div>`).join("");
+  box.innerHTML=`<div class="dinner">
+    <div class="dhead">
+      <h4>Let us get your studio ready</h4>
+      <span class="sub">${failed.length} thing${failed.length>1?"s":""} need${failed.length>1?"":"s"} attention</span>
+      <span class="grow"></span>
+      <button class="qbtn" onclick="runDoctor()">Re-check</button>
+      <button class="dclose" title="Dismiss" onclick="dismissDoctor()">&times;</button>
+    </div>
+    ${rows}
+  </div>`;
+}
+function dismissDoctor(){ doctorDismissed=true; $("#doctor").className="doctor"; }
+
+/* ---------------- queue panel ---------------- */
+function pillClass(s){ s=(s||"").toLowerCase();
+  if(s.includes("run")) return "running";
+  if(s.includes("cancel")) return "cancelled";
+  if(s.includes("done")||s.includes("ok")||s.includes("finish")||s.includes("complete")) return "done";
+  if(s.includes("err")||s.includes("fail")) return "error";
+  return "queued";
+}
+let qPanelOpen=false;
+function toggleQPanel(){
+  qPanelOpen=!qPanelOpen;
+  $("#qpanel").classList.toggle("on",qPanelOpen);
+  $("#qtoggle").classList.toggle("open",qPanelOpen);
+  $("#qtoggleTxt").textContent=qPanelOpen?"Hide":"Details";
+  if(qPanelOpen) renderQPanel();
+}
+function renderQPanel(){
+  const list=$("#qlist"); if(!list) return;
+  const q=STATE.queue||[];
+  if(!q.length){ list.innerHTML='<div class="qpanelempty">No jobs yet. Describe a hero or hit Generate to start.</div>'; return; }
+  const ordered=q.slice().reverse();
+  list.innerHTML=ordered.map(j=>{
+    const cls=pillClass(j.status);
+    const active=(cls==="running"||cls==="queued");
+    const spin=cls==="running"?'<span class="spin"></span>':"";
+    const tries=(j.tries&&j.tries>1)?`<span class="qtries">retry ${j.tries-1}</span>`:"";
+    const cancel=active?`<button class="qcancel" onclick="cancelJob('${esc(String(j.id))}')">Cancel</button>`:"";
+    return `<div class="qrow">
+      <span class="qk">${esc(j.kind||"job")}</span>
+      <span class="qa">${esc(j.asset||"")}</span>
+      <span class="qgrow"></span>
+      ${tries}
+      <span class="pill ${cls}">${spin}${esc(j.status||"")}</span>
+      ${cancel}
+    </div>`;
+  }).join("");
+}
+async function cancelJob(id){
+  try{ await api("/api/queue/cancel",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({id})});
+    toast("Job cancelled."); pollQueue();
+  }catch(e){ toast(e.message,true); }
+}
+async function clearFinished(){
+  try{ const r=await api("/api/queue/clear",{method:"POST"});
+    toast(r.removed?("Cleared "+r.removed+" finished job"+(r.removed>1?"s":"")+"."):"Nothing to clear.");
+    pollQueue();
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ---------------- settings slide-over ---------------- */
+async function openSettings(){
+  $("#settings").classList.add("on");
+  const body=$("#settingsBody");
+  body.innerHTML='<div class="empty" style="height:auto;padding:40px 0"><div class="spin"></div></div>';
+  try{ const r=await api("/api/settings"); SETTINGS=r.settings||{}; }
+  catch(e){ body.innerHTML='<div class="snote err" style="color:var(--bad)">Could not load settings: '+esc(e.message)+'</div>'; return; }
+  renderSettings();
+}
+function closeSettings(){ $("#settings").classList.remove("on"); }
+function sVal(k,d){ return SETTINGS[k]==null?(d==null?"":d):SETTINGS[k]; }
+function num(label,hint,key){
+  return `<div class="sfield"><div class="sf-l"><div class="sf-n">${label}</div>
+    ${hint?`<div class="sf-h">${hint}</div>`:""}</div>
+    <div class="sf-c"><input type="number" step="any" data-key="${key}" value="${esc(sVal(key))}"></div></div>`;
+}
+function txt(label,hint,key){
+  return `<div class="sfield"><div class="sf-l"><div class="sf-n">${label}</div>
+    ${hint?`<div class="sf-h">${hint}</div>`:""}</div>
+    <div class="sf-c"><input type="text" data-key="${key}" value="${esc(sVal(key))}"></div></div>`;
+}
+function sel(label,hint,key,options){
+  const cur=String(sVal(key));
+  const opts=options.map(o=>`<option value="${esc(o)}"${String(o)===cur?" selected":""}>${esc(o)}</option>`).join("");
+  return `<div class="sfield"><div class="sf-l"><div class="sf-n">${label}</div>
+    ${hint?`<div class="sf-h">${hint}</div>`:""}</div>
+    <div class="sf-c"><select data-key="${key}">${opts}</select></div></div>`;
+}
+function bool(label,hint,key){
+  const on=!!SETTINGS[key];
+  return `<div class="sfield"><div class="sf-l"><div class="sf-n">${label}</div>
+    ${hint?`<div class="sf-h">${hint}</div>`:""}</div>
+    <div class="sf-c"><label class="toggle"><input type="checkbox" data-key="${key}" data-bool="1" ${on?"checked":""}>
+      <span class="sw"></span></label></div></div>`;
+}
+function prefBool(label,hint,key){
+  return `<div class="sfield"><div class="sf-l"><div class="sf-n">${label}</div>
+    ${hint?`<div class="sf-h">${hint}</div>`:""}</div>
+    <div class="sf-c"><label class="toggle"><input type="checkbox" data-pref="${key}" ${PREFS[key]?"checked":""}>
+      <span class="sw"></span></label></div></div>`;
+}
+function segField(label,hint,key,options){
+  const cur=PREFS[key];
+  const btns=options.map(o=>`<button type="button" class="${o.v===cur?"on":""}" onclick="setSeg('${key}','${o.v}',this)">${esc(o.t)}</button>`).join("");
+  return `<div class="sfield"><div class="sf-l"><div class="sf-n">${label}</div>
+    ${hint?`<div class="sf-h">${hint}</div>`:""}</div>
+    <div class="sf-c"><div class="seg">${btns}</div></div>`;
+}
+function setSeg(key,val,btn){
+  PREFS[key]=val; savePrefs(); applyTheme();
+  btn.parentElement.querySelectorAll("button").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+}
+function renderSettings(){
+  const body=$("#settingsBody");
+  body.innerHTML=`
+    <div class="sgroup"><h4>Appearance (this browser only)</h4>
+      ${segField("Theme","How the studio looks","theme",[{v:"dark",t:"Dark"},{v:"light",t:"Light"},{v:"system",t:"System"}])}
+      ${segField("Motion","Reduce animations","motion",[{v:"auto",t:"Auto"},{v:"reduce",t:"Reduced"}])}
+      ${prefBool("Confirm before deleting","Ask before removing things","confirmDelete")}
+      ${prefBool("Notify when a batch finishes","A small note when new pictures are ready","notify")}
+    </div>
+    <div class="sgroup"><h4>Generation</h4>
+      ${num("Candidates per batch","How many options to make each time","gen.n_candidates")}
+      ${num("Steps","More steps = slower, often sharper","gen.steps")}
+      ${num("Guidance (CFG)","How strongly it follows the words","gen.cfg")}
+      ${num("Width","Image width in pixels","gen.width")}
+      ${num("Height","Image height in pixels","gen.height")}
+      ${bool("Use reference images (IP-Adapter)","Steer toward your reference set","gen.ip_adapter")}
+      ${sel("Engine","Which image engine to run","engine",["comfyui","diffusers"])}
+      ${txt("Checkpoint (ComfyUI)","The model file to load","comfyui.checkpoint")}
+    </div>
+    <div class="sgroup"><h4>Brain (writes the briefs)</h4>
+      ${sel("Brain","Where the thinking happens","brain",["local","gemini_api","claude"])}
+      ${txt("Local model (Ollama)","Model name for local brain","ollama_model")}
+      ${txt("Gemini model","Used when brain is gemini_api","gemini_model")}
+    </div>
+    <div class="sgroup"><h4>Ranking</h4>
+      ${txt("CLIP model","Scores how well pictures match","rank.clip_model")}
+    </div>
+    <div class="sgroup"><h4>Vector</h4>
+      ${num("Colors","How many colors in the vector art","vector.colors")}
+    </div>
+    <div class="sgroup"><h4>Queue</h4>
+      ${num("Max retries","How many times to retry a failed job","queue.max_retries")}
+      ${num("Poll seconds","How often the queue checks itself","queue.poll_seconds")}
+      ${bool("Restart engine on failure","Recover automatically if the engine crashes","queue.restart_engine_on_fail")}
+    </div>
+    <div class="snote">Generation and engine changes apply to the <b>next</b> generation, not
+      pictures already being made. Appearance settings are saved in this browser only.</div>
+    <div class="btns" style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+      <button class="btn" onclick="closeSettings()">Close</button>
+      <button class="btn primary" onclick="saveSettings()">Save settings</button>
+    </div>`;
+}
+async function saveSettings(){
+  // client prefs first (checkboxes)
+  $("#settingsBody").querySelectorAll("input[data-pref]").forEach(inp=>{
+    PREFS[inp.getAttribute("data-pref")]=inp.checked;
+  });
+  savePrefs(); applyTheme();
+  if(PREFS.notify && "Notification" in window && Notification.permission==="default"){
+    try{ Notification.requestPermission(); }catch(e){}
+  }
+  // backend settings
+  const patch={};
+  $("#settingsBody").querySelectorAll("[data-key]").forEach(inp=>{
+    const k=inp.getAttribute("data-key");
+    if(inp.getAttribute("data-bool")){ patch[k]=inp.checked; return; }
+    let v=inp.value;
+    if(inp.type==="number"){ if(v==="") return; v=parseFloat(v); if(isNaN(v)) return; }
+    patch[k]=v;
+  });
+  try{
+    const r=await api("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({settings:patch})});
+    SETTINGS=r.settings||SETTINGS;
+    toast("Settings saved."); closeSettings();
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ---------------- batch-finished notification ---------------- */
+function notifyBatch(asset){
+  if(!PREFS.notify) return;
+  toast("New pictures ready"+(asset?" for "+asset:")")+".");
+  if("Notification" in window && Notification.permission==="granted"){
+    try{ new Notification("Art Conductor",{body:"New candidates are ready"+(asset?" for "+asset:"")+"."}); }catch(e){}
+  }
+}
+
+/* ---------------- help / guided tour ---------------- */
+const HELP_COPY={
+  resources:{t:"Your computer's load",d:"Live meters for processor, memory and graphics card. Use Pause queue or Stop gen here to reclaim your machine."},
+  tree:{t:"Your work, organized",d:"Categories group your heroes and share a style. Click a hero to open it, or a folder to edit its look."},
+  newhero:{t:"Start here",d:"Describe a new hero. This is the main thing you do: say what you want and let the studio draw it."},
+  gallery:{t:"Candidates and chat",d:"The pictures the studio made. Click one to enlarge, Pick this to choose a winner, then vectorize it. Talk to the conductor on the right to refine."},
+  queue:{t:"What is being made",d:"Jobs waiting or running. Open Details to cancel a job or clear finished ones."},
+  settings:{t:"Settings",d:"Change how pictures are made, which brain writes the briefs, and the look of this dashboard."},
+  doctor:{t:"Health check",d:"Tells you if anything the studio needs is not running, with plain steps to fix it."}
+};
+let helpOn=false;
+function enterHelp(){
+  helpOn=true;
+  const wrap=$("#helpwrap"); wrap.classList.add("on");
+  // clear previous holes/callouts
+  wrap.querySelectorAll(".helphole,.helpcall,.helphint").forEach(n=>n.remove());
+  const hint=document.createElement("div"); hint.className="helphint";
+  hint.textContent="Here is what everything does. Click anywhere or press Esc to exit.";
+  document.body.appendChild(hint);
+  document.querySelectorAll("[data-help]").forEach(el=>{
+    const key=el.getAttribute("data-help"); const copy=HELP_COPY[key]; if(!copy) return;
+    const r=el.getBoundingClientRect();
+    if(r.width<4||r.height<4) return;
+    const pad=6;
+    const hole=document.createElement("div"); hole.className="helphole";
+    hole.style.left=(r.left-pad)+"px"; hole.style.top=(r.top-pad)+"px";
+    hole.style.width=(r.width+pad*2)+"px"; hole.style.height=(r.height+pad*2)+"px";
+    wrap.appendChild(hole);
+    const call=document.createElement("div"); call.className="helpcall";
+    call.innerHTML="<b>"+esc(copy.t)+"</b>"+esc(copy.d);
+    wrap.appendChild(call);
+    // position callout: prefer to the right, else left, else below
+    const vw=window.innerWidth, vh=window.innerHeight, cw=230, ch=110;
+    let x=r.right+14, y=Math.max(8,Math.min(r.top, vh-ch-8));
+    if(x+cw>vw-8){ x=r.left-cw-14; }
+    if(x<8){ x=Math.max(8,Math.min(r.left, vw-cw-8)); y=r.bottom+14; }
+    if(y+ch>vh-8) y=vh-ch-8;
+    call.style.left=x+"px"; call.style.top=y+"px";
+  });
+}
+function exitHelp(){
+  helpOn=false; const wrap=$("#helpwrap"); wrap.classList.remove("on");
+  wrap.querySelectorAll(".helphole,.helpcall").forEach(n=>n.remove());
+  document.querySelectorAll(".helphint").forEach(n=>n.remove());
+}
+
+/* ---------------- utils + boot ---------------- */
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){
+  if(helpOn){ exitHelp(); return; }
+  if($("#settings").classList.contains("on")){ closeSettings(); return; }
+  closeLight();closeNew();closeCatNew();closeCatEdit();closeCatDel();} });
+// reposition help callouts on resize while help mode is open
+window.addEventListener("resize",()=>{ if(helpOn) enterHelp(); });
+// pause resource polling when tab hidden; catch up on return
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ pollResources(); pollQueue(); } });
+
+applyTheme();
+refreshState(); renderMain(); pollQueue(); pollResources(); runDoctor();
+setInterval(pollQueue, 2000);
+setInterval(pollResources, 2000);
+setInterval(refreshState, 8000);
+</script>
+</body>
+</html>

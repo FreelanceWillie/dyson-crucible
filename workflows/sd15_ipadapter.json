@@ -1,0 +1,118 @@
+{
+  "_doc": {
+    "description": "SD1.5 txt2img (ComfyUI API-format prompt graph) with an OPTIONAL IP-Adapter branch. POST this dict to /prompt. gen.py deep-copies it and overwrites values BY NODE ID (never by array index).",
+    "injection_points": {
+      "checkpoint_name": "node '4' -> inputs.ckpt_name (CheckpointLoaderSimple)",
+      "positive_text": "node '6' -> inputs.text (CLIPTextEncode, positive)",
+      "negative_text": "node '7' -> inputs.text (CLIPTextEncode, negative)",
+      "width": "node '5' -> inputs.width (EmptyLatentImage)",
+      "height": "node '5' -> inputs.height (EmptyLatentImage)",
+      "seed": "node '3' -> inputs.seed (KSampler)",
+      "steps": "node '3' -> inputs.steps (KSampler)",
+      "cfg": "node '3' -> inputs.cfg (KSampler)",
+      "ip_adapter_weight": "node '11' -> inputs.weight (IPAdapterAdvanced)",
+      "ip_adapter_preset": "node '10' -> inputs.preset (IPAdapterUnifiedLoader)",
+      "reference_image_filename": "node '12' -> inputs.image (LoadImage; must be a filename already present in ComfyUI/input, e.g. via comfyui.upload_image)"
+    },
+    "ip_adapter_wiring": {
+      "on": "When IP-Adapter is used, KSampler node '3' inputs.model MUST point to ['11', 0] (IPAdapterAdvanced output).",
+      "off": "When IP-Adapter is bypassed, gen.py sets KSampler node '3' inputs.model to ['4', 0] (raw checkpoint model) and deletes nodes '10', '11', '12'."
+    },
+    "requires_custom_nodes": "The IPAdapterUnifiedLoader / IPAdapterAdvanced nodes require the 'ComfyUI_IPAdapter_plus' custom node (cubiq). If it is not installed, run with ip_adapter_weight<=0 so gen.py strips the branch and uses plain txt2img.",
+    "notes": "Node IDs are strings (ComfyUI API format). Links are [<node_id>, <output_index>] pairs."
+  },
+
+  "4": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "v1-5-pruned-emaonly.safetensors"
+    }
+  },
+
+  "5": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 512,
+      "height": 512,
+      "batch_size": 1
+    }
+  },
+
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "PLACEHOLDER_POSITIVE_PROMPT",
+      "clip": ["4", 1]
+    }
+  },
+
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "PLACEHOLDER_NEGATIVE_PROMPT",
+      "clip": ["4", 1]
+    }
+  },
+
+  "10": {
+    "class_type": "IPAdapterUnifiedLoader",
+    "inputs": {
+      "preset": "PLUS",
+      "model": ["4", 0]
+    }
+  },
+
+  "12": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "PLACEHOLDER_REFERENCE.png"
+    }
+  },
+
+  "11": {
+    "class_type": "IPAdapterAdvanced",
+    "inputs": {
+      "weight": 0.8,
+      "weight_type": "linear",
+      "combine_embeds": "concat",
+      "start_at": 0.0,
+      "end_at": 1.0,
+      "embeds_scaling": "V only",
+      "model": ["10", 0],
+      "ipadapter": ["10", 1],
+      "image": ["12", 0]
+    }
+  },
+
+  "3": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0,
+      "steps": 28,
+      "cfg": 7.0,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1.0,
+      "model": ["11", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "latent_image": ["5", 0]
+    }
+  },
+
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["3", 0],
+      "vae": ["4", 2]
+    }
+  },
+
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "conductor",
+      "images": ["8", 0]
+    }
+  }
+}

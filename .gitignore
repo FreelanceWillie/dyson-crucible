@@ -1,0 +1,28 @@
+# --- Python environment ---
+.venv/
+__pycache__/
+*.pyc
+
+# --- Model caches / weights (large, never commit) ---
+.cache/
+models/
+*.safetensors
+*.bin
+*.ckpt
+
+# --- Generated output ---
+outputs/**
+outputs/_jobs.json
+vectors/*.svg
+
+# --- Generated brief content (keep folder markers only) ---
+briefs/*/
+
+# --- User reference images (keep README + folder markers only) ---
+references/**/*
+!references/README.txt
+!references/.gitkeep
+!references/**/.gitkeep
+
+# --- Keep folder markers ---
+!.gitkeep
