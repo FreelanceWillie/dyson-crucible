@@ -560,6 +560,19 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"ok": True, "presets": presets})
             return
 
+        if path == "/api/loras":
+            # set the LoRAs applied to a hero's gens: [{name, weight}]
+            name = (data.get("name") or "").strip()
+            loras = data.get("loras")
+            if not name or not briefmod.exists(name, paths["briefs"]):
+                self._send_json({"error": "no such asset: " + name}, 404)
+                return
+            b = briefmod.load(name, paths["briefs"])
+            b["loras"] = loras if isinstance(loras, list) else []
+            briefmod.save(name, b, paths["briefs"])
+            self._send_json({"ok": True, "brief": b})
+            return
+
         if path == "/api/refs":
             # attach role-tagged reference images to a hero for multi-image blend
             # refs: [{role:"style"|"subject", path:"<fs path from /api/upload>"}]

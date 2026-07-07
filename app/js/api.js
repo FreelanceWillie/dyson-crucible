@@ -54,6 +54,7 @@ export const api = {
   poses: (name, poses) => POST('/api/character/poses', { name, poses }),
   assign: (name, category) => POST('/api/assign', { name, category }),
   refs: (name, refs) => POST('/api/refs', { name, refs }),
+  setLoras: (name, loras) => POST('/api/loras', { name, loras }),
   upload: (dataUrl, into, filename) => POST('/api/upload', { dataUrl, into, filename }),
   explore: (phrase, n, category, asset) => POST('/api/explore', { phrase, n, category, asset }),
   synthesize: (phrase, picks, category) => POST('/api/synthesize', { phrase, picks, category }),

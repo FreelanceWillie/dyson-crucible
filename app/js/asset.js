@@ -201,6 +201,50 @@ function refsBlock() {
   return box;
 }
 
+// ---- LoRA picker: apply downloaded LoRAs to this hero's gens ----
+function currentLoras() {
+  const b = (data && data.brief) || {};
+  return Array.isArray(b.loras) ? b.loras : [];
+}
+function saveLoras(loras) {
+  return api.setLoras(state.current, loras)
+    .then(() => { toast('LoRAs updated'); return load(); })
+    .catch((e) => toast('Could not save LoRAs: ' + e.message, 'bad'));
+}
+function lorasBlock() {
+  const box = document.createElement('div'); box.className = 'card'; box.style.marginTop = '10px';
+  box.appendChild(Object.assign(document.createElement('div'), { className: 'h', textContent: 'LoRAs (optional style / character models)' }));
+  const list = document.createElement('div'); box.appendChild(list);
+  const loras = currentLoras();
+  if (loras.length) {
+    loras.forEach((l, i) => {
+      const row = document.createElement('div'); row.className = 'row'; row.style.gap = '8px'; row.style.marginTop = '4px';
+      row.innerHTML = `<span class="chip">${esc(l.name)}</span><span class="faint">weight ${esc(String(l.weight))}</span>`;
+      const rm = document.createElement('button'); rm.className = 'btn sm bad'; rm.textContent = 'remove';
+      rm.onclick = () => saveLoras(currentLoras().filter((_, j) => j !== i));
+      row.appendChild(rm); list.appendChild(row);
+    });
+  } else {
+    list.innerHTML = '<div class="faint">None. Add a downloaded LoRA to steer this hero.</div>';
+  }
+  const add = document.createElement('div'); add.className = 'row'; add.style.marginTop = '8px';
+  const sel = document.createElement('select'); sel.innerHTML = '<option value="">loading installed...</option>'; sel.style.flex = '1';
+  const wt = document.createElement('input'); wt.type = 'number'; wt.step = '0.1'; wt.value = '0.8'; wt.style.width = '72px'; wt.title = 'weight';
+  const btn = document.createElement('button'); btn.className = 'btn sm'; btn.textContent = 'Add LoRA';
+  add.appendChild(sel); add.appendChild(wt); add.appendChild(btn); box.appendChild(add);
+  api.modelsInstalled().then((r) => {
+    const ls = (r && r.loras) || [];
+    sel.innerHTML = ls.length ? ls.map((n) => `<option>${esc(n)}</option>`).join('')
+      : '<option value="">no LoRAs installed (get some in the Model Manager)</option>';
+  }).catch(() => { sel.innerHTML = '<option value="">Model Manager unavailable</option>'; });
+  btn.onclick = () => {
+    const name = sel.value;
+    if (!name) { toast('Pick a LoRA, or download one in the Model Manager'); return; }
+    saveLoras(currentLoras().concat([{ name, weight: parseFloat(wt.value) || 0.8 }]));
+  };
+  return box;
+}
+
 // ---- brief block: readable chips + full-history <details> ----
 function briefBlock() {
   const brief = (data && (data.brief || data.vector)) || {};
@@ -461,6 +505,7 @@ function render() {
 
   head.appendChild(briefBlock());
   head.appendChild(refsBlock());
+  head.appendChild(lorasBlock());
   m.appendChild(head);
 
   m.appendChild(galleryBlock());
