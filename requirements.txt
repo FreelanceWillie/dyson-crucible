@@ -1,4 +1,4 @@
-# Helios - Python dependencies
+# Dyson Crucible - Python dependencies
 #
 # NOTE: torch + torchvision are NOT listed here. They must be installed
 # separately from the CUDA wheel index so you get the GPU build:

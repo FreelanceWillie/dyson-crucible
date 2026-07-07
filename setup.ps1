@@ -1,4 +1,4 @@
-# Helios - Windows setup (PowerShell 5.1 safe)
+# Dyson Crucible - Windows setup (PowerShell 5.1 safe)
 #
 # Run from the repo root:  .\setup.ps1
 #
@@ -10,7 +10,7 @@ $ErrorActionPreference = "Continue"
 
 Write-Host ""
 Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host " Helios - setup" -ForegroundColor Cyan
+Write-Host " Dyson Crucible - setup" -ForegroundColor Cyan
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -133,7 +133,7 @@ Write-Host "        - An SD1.5 checkpoint in  ComfyUI/models/checkpoints/"
 Write-Host "        - The custom node  ComfyUI_IPAdapter_plus  (for style steering)"
 Write-Host ""
 Write-Host "      Optional: set  comfyui.exe  in config.yaml to your ComfyUI"
-Write-Host "      launcher so Helios can start it for you automatically."
+Write-Host "      launcher so Dyson Crucible can start it for you automatically."
 
 # ---------------------------------------------------------------------
 # 8. Done

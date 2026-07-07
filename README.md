@@ -1,4 +1,4 @@
-# Helios
+# Dyson Crucible
 
 A little art studio that runs entirely on your own PC, for free, and draws in your style so you never have to.
 
@@ -25,7 +25,7 @@ You install three things once, then you are set.
 
 5. **Add your reference art.** Put 8 to 20 images you like into the `references/default/` folder.
 6. **Start the engines.** Launch ComfyUI, and in another terminal run `ollama serve`.
-7. **Run Helios and open it in your browser:**
+7. **Run Dyson Crucible and open it in your browser:**
 
    ```
    python conductor/server.py

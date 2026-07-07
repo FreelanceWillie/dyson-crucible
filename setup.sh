@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Helios - Linux / macOS setup (bash)
+# Dyson Crucible - Linux / macOS setup (bash)
 #
 # Run from the repo root:  bash setup.sh
 #
@@ -10,7 +10,7 @@ set +e
 
 echo ""
 echo "====================================================="
-echo " Helios - setup"
+echo " Dyson Crucible - setup"
 echo "====================================================="
 echo ""
 
@@ -118,7 +118,7 @@ echo "        - An SD1.5 checkpoint in  ComfyUI/models/checkpoints/"
 echo "        - The custom node  ComfyUI_IPAdapter_plus  (for style steering)"
 echo ""
 echo "      Optional: set  comfyui.exe  in config.yaml to your ComfyUI"
-echo "      launcher so Helios can start it for you automatically."
+echo "      launcher so Dyson Crucible can start it for you automatically."
 
 # ---------------------------------------------------------------------
 # 8. Done
