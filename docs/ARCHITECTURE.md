@@ -1,4 +1,4 @@
-# Art Conductor - Architecture
+# Helios - Architecture
 
 Internal reference for a developer (or the conductor LLM) working on the system.
 Fully local, $0, plug-and-play SD1.5 art dashboard for a solo game dev.

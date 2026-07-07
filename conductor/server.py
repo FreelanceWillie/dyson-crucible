@@ -1189,7 +1189,7 @@ def serve(port=None):
     _start_worker()
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     url = "http://127.0.0.1:{0}/".format(port)
-    print("Art Conductor dashboard running at " + url)
+    print("Helios dashboard running at " + url)
     print("Open that URL in your browser. Press Ctrl+C to stop.")
     try:
         httpd.serve_forever()

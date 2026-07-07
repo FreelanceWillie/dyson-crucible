@@ -1,4 +1,4 @@
-# Art Conductor - central configuration
+# Helios - central configuration
 # ---------------------------------------------------------------------------
 # This file is loaded once at startup (searched from the repo root). Every
 # value has a sane default baked into the code, so a missing key is never fatal

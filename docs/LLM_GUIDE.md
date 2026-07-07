@@ -1,7 +1,7 @@
 # LLM Guide - You Are the Conductor Brain
 
 This document is written **to you**, the local model (default: `qwen2.5:7b-instruct`)
-that Art Conductor uses as its "conductor brain." Read it as your operating manual.
+that Helios uses as its "conductor brain." Read it as your operating manual.
 Follow it exactly. When this guide and your instincts disagree, follow this guide.
 
 ---
