@@ -365,6 +365,20 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(exc)}, 500)
             return
 
+        if path == "/api/postprocess/samples":
+            # precomputed example of each look on a bundled sample sprite, so the
+            # picker shows "what this does" before he uses it. Generated once, cached.
+            try:
+                sdir = self._ensure_samples()
+                samples = {}
+                for f in os.listdir(sdir):
+                    if f.lower().endswith(".png") and not f.startswith("_"):
+                        samples[f[:-4]] = "/app/samples/" + f
+                self._send_json({"base": "/app/samples/_base.png", "samples": samples})
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500)
+            return
+
         if path == "/api/presets":
             self._send_json({"presets": self._load_presets(paths)})
             return
@@ -740,6 +754,43 @@ class Handler(BaseHTTPRequestHandler):
                              "note": "Private reference only. Do not ship copyrighted or trademarked images."})
             return
 
+        if path == "/api/postprocess/preview":
+            # apply ONE step to a downscaled copy of an image, return a data URL.
+            # fast for the look filters; the heavy steps (bg_remove/upscale/vectorize)
+            # take a moment but still work.
+            step = (data.get("step") or "").strip()
+            raw_src = data.get("src") or ""
+            src = _url_to_fspath(paths, raw_src) or raw_src
+            if not os.path.isfile(src) and raw_src.startswith("/app/"):
+                src = os.path.join(APP_DIR, raw_src[len("/app/"):].replace("/", os.sep))
+            if not step or step not in ppmod.STEPS:
+                self._send_json({"error": "unknown step"}, 400)
+                return
+            if not os.path.isfile(src):
+                self._send_json({"error": "source not found"}, 404)
+                return
+            try:
+                import base64
+                import tempfile
+                from PIL import Image
+                tmpd = tempfile.mkdtemp()
+                small = os.path.join(tmpd, "in.png")
+                im = Image.open(src).convert("RGBA")
+                im.thumbnail((256, 256), Image.LANCZOS)
+                im.save(small)
+                out = os.path.join(tmpd, "out.png")
+                res = ppmod.STEPS[step](small, data.get("params") or {}, out)
+                if res.lower().endswith(".svg"):
+                    with open(res, "r", encoding="utf-8") as fh:
+                        self._send_json({"svg": fh.read()})
+                    return
+                with open(res, "rb") as fh:
+                    b64 = base64.b64encode(fh.read()).decode("ascii")
+                self._send_json({"dataUrl": "data:image/png;base64," + b64})
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500)
+            return
+
         if path == "/api/postprocess":
             name = (data.get("name") or "").strip()
             src = (data.get("src") or "").strip()
@@ -820,6 +871,39 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         self._send_json({"error": "unknown endpoint: " + path}, 404)
+
+    def _ensure_samples(self):
+        """Generate a small example of every post-processing step on a bundled
+        sample sprite (once, cached under app/samples/), so the picker can show
+        what each look does before it is applied."""
+        sdir = os.path.join(APP_DIR, "samples")
+        marker = os.path.join(sdir, "_done")
+        if os.path.isfile(marker):
+            return sdir
+        os.makedirs(sdir, exist_ok=True)
+        from PIL import Image, ImageDraw
+        # a simple colorful sprite with transparency (so bg_remove/outline read well)
+        s = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(s)
+        dr.ellipse((14, 14, 114, 114), fill=(70, 120, 210, 255))
+        dr.ellipse((40, 34, 88, 82), fill=(245, 205, 70, 255))
+        dr.rectangle((58, 74, 70, 116), fill=(200, 60, 60, 255))
+        dr.ellipse((52, 44, 62, 54), fill=(20, 20, 30, 255))
+        dr.ellipse((70, 44, 80, 54), fill=(20, 20, 30, 255))
+        base = os.path.join(sdir, "_base.png")
+        s.save(base)
+        for name, fn in ppmod.STEPS.items():
+            out = os.path.join(sdir, name + ".png")
+            try:
+                res = fn(base, {}, out)
+                # vectorize outputs svg; leave no png so the UI falls back to the base
+                if res.lower().endswith(".svg") and os.path.isfile(out):
+                    pass
+            except Exception:
+                pass
+        with open(marker, "w", encoding="utf-8") as fh:
+            fh.write("1")
+        return sdir
 
     def _presets_file(self, paths):
         return os.path.join(paths["outputs"], "_presets.json")
