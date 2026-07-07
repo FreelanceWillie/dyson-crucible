@@ -641,6 +641,92 @@ def step_normal_map(in_path, params, out_path):
     return out_path
 
 
+def step_halftone(in_path, params, out_path):
+    """Comic halftone dots sized by darkness. params: cell."""
+    from PIL import Image, ImageDraw  # lazy
+    cell = max(3, int((params or {}).get("cell", 6)))
+    g = Image.open(in_path).convert("L")
+    w, h = g.size
+    px = g.load()
+    out = Image.new("RGB", (w, h), (255, 255, 255))
+    dr = ImageDraw.Draw(out)
+    for y in range(0, h, cell):
+        for x in range(0, w, cell):
+            tot = cnt = 0
+            for yy in range(y, min(y + cell, h)):
+                for xx in range(x, min(x + cell, w)):
+                    tot += px[xx, yy]; cnt += 1
+            b = tot / max(1, cnt)
+            r = (1 - b / 255.0) * (cell / 2.0)
+            if r > 0.4:
+                cx, cy = x + cell / 2.0, y + cell / 2.0
+                dr.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(0, 0, 0))
+    out.save(out_path)
+    return out_path
+
+
+def step_vignette(in_path, params, out_path):
+    """Darken the edges. Needs numpy; passes through if absent. params: strength."""
+    from PIL import Image  # lazy
+    np = _np()
+    im = Image.open(in_path).convert("RGB")
+    if np is None:
+        im.save(out_path)
+        return out_path
+    strength = float((params or {}).get("strength", 0.6))
+    w, h = im.size
+    a = np.asarray(im).astype("float32")
+    yy, xx = np.mgrid[0:h, 0:w]
+    d = np.sqrt(((xx - w / 2.0) / (w / 2.0)) ** 2 + ((yy - h / 2.0) / (h / 2.0)) ** 2)
+    mask = np.clip(1 - strength * (d ** 2), 0, 1)[..., None]
+    Image.fromarray((a * mask).astype("uint8")).save(out_path)
+    return out_path
+
+
+def step_sepia(in_path, params, out_path):
+    """Warm sepia tone (brightness mapped to a warm ramp)."""
+    from PIL import Image  # lazy
+    g = Image.open(in_path).convert("L")
+    d, l = (20, 10, 0), (255, 240, 200)
+    lut = []
+    for c in range(3):
+        lut += [int(d[c] + (l[c] - d[c]) * i / 255) for i in range(256)]
+    Image.merge("RGB", (g, g, g)).point(lut).save(out_path)
+    return out_path
+
+
+def step_invert(in_path, params, out_path):
+    """Invert colors (keeps alpha)."""
+    from PIL import Image, ImageOps  # lazy
+    im = Image.open(in_path).convert("RGBA")
+    r, g, b, a = im.split()
+    rgb = ImageOps.invert(Image.merge("RGB", (r, g, b)))
+    Image.merge("RGBA", (*rgb.split(), a)).save(out_path)
+    return out_path
+
+
+def step_glow(in_path, params, out_path):
+    """Soft bloom/glow. params: radius, intensity."""
+    from PIL import Image, ImageFilter, ImageChops  # lazy
+    p = params or {}
+    radius = int(p.get("radius", 8))
+    intensity = float(p.get("intensity", 0.6))
+    im = Image.open(in_path).convert("RGB")
+    blur = im.filter(ImageFilter.GaussianBlur(radius)).point(lambda v: int(v * intensity))
+    ImageChops.screen(im, blur).save(out_path)
+    return out_path
+
+
+def step_frame(in_path, params, out_path):
+    """Add a solid border/frame. params: width, color."""
+    from PIL import Image, ImageOps  # lazy
+    p = params or {}
+    w = int(p.get("width", 6))
+    ImageOps.expand(Image.open(in_path).convert("RGBA"), border=w,
+                    fill=_hex(p.get("color", "#000000")) + (255,)).save(out_path)
+    return out_path
+
+
 STEPS = {
     "trim": step_trim,
     "bg_remove": step_bg_remove,
@@ -652,6 +738,12 @@ STEPS = {
     "resize": step_resize,
     "outline": step_outline,
     "crop_square": step_crop_square,
+    "halftone": step_halftone,
+    "vignette": step_vignette,
+    "sepia": step_sepia,
+    "invert": step_invert,
+    "glow": step_glow,
+    "frame": step_frame,
     "dither": step_dither,
     "pixelate": step_pixelate,
     "palette_map": step_palette_map,
@@ -711,6 +803,38 @@ _STEP_META = {
         "params": {"width": {"type": "int", "default": 512},
                    "height": {"type": "int", "default": 512},
                    "keep_aspect": {"type": "bool", "default": True}},
+        "changes_ext": None,
+    },
+    "halftone": {
+        "description": "Comic halftone dots.",
+        "params": {"cell": {"type": "int", "default": 6}},
+        "changes_ext": None,
+    },
+    "vignette": {
+        "description": "Darken the edges for focus/mood.",
+        "params": {"strength": {"type": "float", "default": 0.6}},
+        "changes_ext": None,
+    },
+    "sepia": {
+        "description": "Warm vintage sepia tone.",
+        "params": {},
+        "changes_ext": None,
+    },
+    "invert": {
+        "description": "Invert colors (negative).",
+        "params": {},
+        "changes_ext": None,
+    },
+    "glow": {
+        "description": "Soft bloom / glow.",
+        "params": {"radius": {"type": "int", "default": 8},
+                   "intensity": {"type": "float", "default": 0.6}},
+        "changes_ext": None,
+    },
+    "frame": {
+        "description": "Add a solid border/frame.",
+        "params": {"width": {"type": "int", "default": 6},
+                   "color": {"type": "str", "default": "#000000"}},
         "changes_ext": None,
     },
     "dither": {
