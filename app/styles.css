@@ -94,15 +94,18 @@ textarea { resize: vertical; min-height: 64px; }
 
 /* overlays */
 .overlay, .helpoverlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 40; padding: 16px; }
-.overlay.on, .helpoverlay.on { display: flex; }
+.overlay.on, .helpoverlay.on, .overlay.open, .helpoverlay.open { display: flex; }
+/* module-convention aliases (agents named these slightly differently) */
+.modal.on, .modal.open { display: flex; }
+.in { font: inherit; color: var(--ink); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 9px; }
 .box { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); max-width: 680px; width: 100%; max-height: 90vh; overflow: auto; box-shadow: var(--shadow); }
 .box .hd { padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; font-weight: 700; }
 .box .bd { padding: 16px; }
 .slideover { position: fixed; top: 0; right: 0; height: 100%; width: 380px; max-width: 92vw; background: var(--panel);
   border-left: 1px solid var(--line); transform: translateX(105%); transition: transform .22s ease; z-index: 45; overflow: auto; box-shadow: var(--shadow); }
-.slideover.on { transform: none; }
+.slideover.on, .slideover.open { transform: none; }
 .palette { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: flex-start; justify-content: center; padding-top: 12vh; z-index: 50; }
-.palette.on { display: flex; }
+.palette.on, .palette.open { display: flex; }
 
 /* toasts */
 .toasts { position: fixed; right: 14px; bottom: 60px; display: flex; flex-direction: column; gap: 8px; z-index: 60; }
