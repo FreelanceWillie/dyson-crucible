@@ -67,6 +67,10 @@ _MNODE_SUBJECT_LOADIMAGE = "22"
 _DEFAULT_STYLE_WEIGHT = 0.7
 _DEFAULT_SUBJECT_WEIGHT = 0.8
 
+# Nodes that consume the checkpoint's CLIP output (positive/negative encoders).
+# LoRAs patch CLIP too, so these get repointed to the last LoraLoader's clip.
+_CLIP_CONSUMERS = (_NODE_POS, _NODE_NEG)
+
 # A light style suffix appended to every positive prompt. Kept gentle so it
 # steers toward clean game-art without overriding the brief.
 _STYLE_SUFFIX = "clean game art, crisp, high quality"
@@ -155,6 +159,86 @@ def _parse_refs(brief: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return {"styles": styles, "subject": subject}
 
 
+def _inject_loras(wf: Dict[str, Any], loras: Any) -> None:
+    """Insert a LoraLoader chain between the checkpoint and its consumers.
+
+    A LoRA patches BOTH the model and the CLIP, so it must sit right after the
+    CheckpointLoaderSimple (node _NODE_CHECKPOINT) and before anything that reads
+    model or clip from it. For each valid lora we add a LoraLoader node ('lora_0',
+    'lora_1', ...) wired in sequence: the first reads model+clip from the
+    checkpoint, each subsequent one from the previous LoraLoader. Then we repoint:
+
+      * every CLIP consumer (the two CLIPTextEncode nodes) -> [last_lora, 1]
+      * the model consumer (KSampler, or the first IP-Adapter loader if present)
+        that currently reads model from the checkpoint -> [last_lora, 0]
+
+    No-op (leaves `wf` untouched) when `loras` is empty or contains no usable
+    entries, so the no-lora path is byte-identical to before. Tolerant of a
+    malformed list: bad entries are skipped, not fatal.
+    """
+    if not loras or not isinstance(loras, (list, tuple)):
+        return
+
+    # Build the sanitized list of (name, weight) first; bail if none survive.
+    clean: List[Dict[str, Any]] = []
+    for entry in loras:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name")
+        if not name or not isinstance(name, str):
+            continue
+        try:
+            weight = float(entry.get("weight", 1.0))
+        except (TypeError, ValueError):
+            weight = 1.0
+        clean.append({"name": name, "weight": weight})
+    if not clean:
+        return
+
+    if _NODE_CHECKPOINT not in wf:
+        return
+
+    # Chain the LoraLoader nodes. model+clip source starts at the checkpoint.
+    src_model = [_NODE_CHECKPOINT, 0]
+    src_clip = [_NODE_CHECKPOINT, 1]
+    last_id = _NODE_CHECKPOINT
+    for i, lora in enumerate(clean):
+        nid = f"lora_{i}"
+        wf[nid] = {
+            "class_type": "LoraLoader",
+            "inputs": {
+                "lora_name": lora["name"],
+                "strength_model": lora["weight"],
+                "strength_clip": lora["weight"],
+                "model": src_model,
+                "clip": src_clip,
+            },
+        }
+        src_model = [nid, 0]
+        src_clip = [nid, 1]
+        last_id = nid
+
+    # Repoint CLIP consumers (positive/negative encoders) onto the last LoRA.
+    for nid in _CLIP_CONSUMERS:
+        node = wf.get(nid)
+        if isinstance(node, dict) and node.get("inputs", {}).get("clip") == [_NODE_CHECKPOINT, 1]:
+            node["inputs"]["clip"] = [last_id, 1]
+
+    # Repoint the model consumer: prefer the first IP-Adapter loader still in the
+    # graph, else the KSampler. Whichever currently reads model from the
+    # checkpoint gets pointed at the last LoRA's patched model output instead.
+    model_consumers = (
+        _NODE_IP_LOADER, _NODE_IP_ADVANCED,
+        _MNODE_STYLE_LOADER, _MNODE_STYLE_ADVANCED,
+        _MNODE_SUBJECT_LOADER, _MNODE_SUBJECT_ADVANCED,
+        _NODE_KSAMPLER,
+    )
+    for nid in model_consumers:
+        node = wf.get(nid)
+        if isinstance(node, dict) and node.get("inputs", {}).get("model") == [_NODE_CHECKPOINT, 0]:
+            node["inputs"]["model"] = [last_id, 0]
+
+
 def _inject_common(
     wf: Dict[str, Any], brief: Dict[str, Any], cfg: Dict[str, Any], seed: int
 ) -> None:
@@ -235,6 +319,10 @@ def _build_multi_workflow(
         # No subject: KSampler reads from the style adapter, or raw checkpoint.
         ks["model"] = [_MNODE_STYLE_ADVANCED, 0] if have_style else [_NODE_CHECKPOINT, 0]
 
+    loras = brief.get("loras")
+    if loras:
+        _inject_loras(wf, loras)
+
     return wf
 
 
@@ -295,6 +383,10 @@ def _build_workflow(
         ks["model"] = [_NODE_CHECKPOINT, 0]
         for nid in (_NODE_IP_ADVANCED, _NODE_IP_LOADER, _NODE_IP_LOADIMAGE):
             wf.pop(nid, None)
+
+    loras = brief.get("loras")
+    if loras:
+        _inject_loras(wf, loras)
 
     return wf
 

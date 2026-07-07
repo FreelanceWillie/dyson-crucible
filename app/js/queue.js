@@ -20,10 +20,10 @@ function renderRes() {
   else { parts.push('<span class="chip">CPU only</span>'); }
   const paused = r.queue_paused;
   parts.push(`<button class="btn sm" id="qpause">${paused ? '&#9654; Resume' : '&#10073;&#10073; Pause'}</button>`);
-  parts.push(`<button class="btn sm" id="qstop">&#9632; Stop gen</button>`);
+  parts.push(`<button class="btn sm bad" id="qpanic" title="Pause, stop the current gen, and free the GPU">&#9888; Reclaim machine</button>`);
   bar.innerHTML = parts.join('');
   const p = bar.querySelector('#qpause'); if (p) { p.onclick = () => (paused ? api.qResume() : api.qPause()).then(() => toast(paused ? 'Queue resumed' : 'Queue paused')); }
-  const s = bar.querySelector('#qstop'); if (s) { s.onclick = () => api.genStop().then(() => toast('Stopping current gen')); }
+  const k = bar.querySelector('#qpanic'); if (k) { k.onclick = () => api.panic().then((r) => toast(r.vram_freed ? 'Machine reclaimed. GPU freed.' : 'Queue paused, gen stopped.', 'good')); }
 }
 
 function renderQueue() {

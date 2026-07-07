@@ -199,6 +199,24 @@ def clear_finished() -> int:
     return removed
 
 
+def recover_orphans() -> int:
+    """Crash recovery: any job left 'running' (the process died mid-gen) is put
+    back to 'queued' so it retries. Called once at worker startup. Returns count.
+    The queue + briefs + outputs all live on disk, so nothing is lost: reopening
+    the app resumes exactly where it left off."""
+    jobs = _load()
+    n = 0
+    for j in jobs:
+        if j.get("status") == "running":
+            j["status"] = "queued"
+            j["updated"] = _now()
+            n += 1
+    if n:
+        _save(jobs)
+        print("[jobs] recovered {0} orphaned job(s) after a restart.".format(n))
+    return n
+
+
 def _update(job_id: str, **fields: Any) -> Optional[Dict[str, Any]]:
     """Patch a job on disk with the given fields; return the updated job."""
     jobs = _load()
@@ -415,6 +433,7 @@ def worker_loop(cfg: Optional[Dict[str, Any]] = None, stop_flag: Optional[Callab
         cfg = _cfg.load_config()
     poll = float((cfg.get("queue", {}) or {}).get("poll_seconds", 2))
 
+    recover_orphans()  # crash recovery: requeue anything left mid-flight
     print("[jobs] worker loop started.")
     while True:
         if stop_flag is not None:

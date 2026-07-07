@@ -254,6 +254,17 @@ def interrupt(url: str) -> None:
         pass
 
 
+def free_vram(url: str) -> bool:
+    """Ask ComfyUI to unload models + free memory (reclaim VRAM). Best effort."""
+    if requests is None:
+        return False
+    try:
+        requests.post(_base(url) + "/free", json={"unload_models": True, "free_memory": True}, timeout=8)
+        return True
+    except Exception:  # noqa: BLE001 - best effort
+        return False
+
+
 def new_client_id() -> str:
     """Convenience: a fresh client_id for /prompt submissions."""
     return uuid.uuid4().hex

@@ -84,6 +84,14 @@ gen:
   height: 512
   ip_adapter: true                  # steer with reference images (IP-Adapter)
   n_candidates: 4                   # how many images to gen per run
+  # --- LoRAs ---
+  # LoRAs are per-asset, NOT global: set them on the brief as
+  #   loras: [ {name: "<file in ComfyUI/models/loras>", weight: 0.8}, ... ]
+  # When a brief carries a non-empty loras list, gen.py injects a LoraLoader
+  # chain right after the checkpoint (patching both model + CLIP) before the
+  # IP-Adapter / KSampler nodes. Absent/empty -> plain gen, no LoRA (no change).
+  # The Model Manager downloads LoRA files into <comfyui.root>/models/loras.
+  default_loras: []                 # optional fallback; brief.loras takes precedence
 
 # --- Low-VRAM safety (4GB cards). The dashboard Doctor recommends launching
 # ComfyUI with --lowvram so the model streams from system RAM (no OOM crash;

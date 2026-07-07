@@ -860,6 +860,56 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"ok": True})
             return
 
+        if path == "/api/panic":
+            # KILL SWITCH / reclaim the machine: pause the queue, stop the current
+            # gen, and free ComfyUI's VRAM. Instant GPU back.
+            jobs.set_paused(True)
+            freed = False
+            try:
+                import comfyui as _c  # type: ignore
+                url = (conf.get("comfyui", {}) or {}).get("url", "")
+                if url:
+                    _c.interrupt(url)
+                    freed = _c.free_vram(url)
+            except Exception:
+                pass
+            self._send_json({"ok": True, "paused": True, "vram_freed": freed})
+            return
+
+        if path == "/api/vram/free":
+            try:
+                import comfyui as _c  # type: ignore
+                url = (conf.get("comfyui", {}) or {}).get("url", "")
+                ok = _c.free_vram(url) if url else False
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500)
+                return
+            self._send_json({"ok": ok})
+            return
+
+        if path.startswith("/api/setup/"):
+            # actionable Doctor: launch a required service so a red check turns green
+            what = path[len("/api/setup/"):]
+            try:
+                import subprocess
+                if what == "start-comfyui":
+                    import comfyui as _c  # type: ignore
+                    ok = _c.ensure_up(conf)
+                    self._send_json({"ok": bool(ok),
+                                     "detail": "Starting ComfyUI" if ok else "Set comfyui.exe in settings so it can auto-start."})
+                    return
+                if what == "start-ollama":
+                    try:
+                        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        self._send_json({"ok": True, "detail": "Starting Ollama"})
+                    except Exception:
+                        self._send_json({"ok": False, "detail": "Ollama not found. Install from ollama.com/download."})
+                    return
+                self._send_json({"error": "unknown setup action"}, 404)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500)
+            return
+
         if path == "/api/settings":
             # patch a small allow-list of config.yaml values from the GUI
             try:

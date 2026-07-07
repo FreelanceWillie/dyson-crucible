@@ -24,6 +24,12 @@
       "neither": "Drop nodes '10','11','12','20','21','22'. Point KSampler '3' inputs.model = ['4', 0]. Equivalent to plain txt2img (fall back to the single-ref workflow instead in practice)."
     },
     "requires_custom_nodes": "IPAdapterUnifiedLoader / IPAdapterAdvanced require 'ComfyUI_IPAdapter_plus' (cubiq). weight_type values used ('style transfer','composition') require a recent version; if unsupported, change them to 'linear' in this file.",
+    "lora_injection": {
+      "description": "LoRAs are NOT in this static template; gen.py injects a LoraLoader chain at runtime when brief['loras'] is non-empty (see gen._inject_loras). Each LoraLoader is inserted right after the checkpoint and before its model/clip consumers, so LoRA patching flows into both IP-Adapter branches and the CLIP encoders.",
+      "checkpoint_node": "node '4' (CheckpointLoaderSimple) is the model source ['4',0] and clip source ['4',1] that the first LoraLoader taps.",
+      "clip_consumers": "nodes '6' and '7' (CLIPTextEncode positive/negative) read clip from ['4',1]; repointed to the last LoraLoader's clip output.",
+      "model_consumer": "the model input currently reading ['4',0] is repointed to the last LoraLoader's model output. After branch bypass that is node '10' (style loader) when style is present, node '20' (subject loader) in the no-style case, or node '3' (KSampler) when neither branch remains."
+    },
     "notes": "Node IDs are strings (ComfyUI API format). Links are [<node_id>, <output_index>] pairs. STYLE branch = 10/11/12, SUBJECT branch = 20/21/22."
   },
 

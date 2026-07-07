@@ -19,6 +19,12 @@
       "off": "When IP-Adapter is bypassed, gen.py sets KSampler node '3' inputs.model to ['4', 0] (raw checkpoint model) and deletes nodes '10', '11', '12'."
     },
     "requires_custom_nodes": "The IPAdapterUnifiedLoader / IPAdapterAdvanced nodes require the 'ComfyUI_IPAdapter_plus' custom node (cubiq). If it is not installed, run with ip_adapter_weight<=0 so gen.py strips the branch and uses plain txt2img.",
+    "lora_injection": {
+      "description": "LoRAs are NOT in this static template; gen.py injects a LoraLoader chain at runtime when brief['loras'] is non-empty (see gen._inject_loras). Each LoraLoader is inserted right after the checkpoint and before its model/clip consumers.",
+      "checkpoint_node": "node '4' (CheckpointLoaderSimple) is the model source ['4',0] and clip source ['4',1] that the first LoraLoader taps.",
+      "clip_consumers": "nodes '6' and '7' (CLIPTextEncode positive/negative) read clip from ['4',1]; repointed to the last LoraLoader's clip output.",
+      "model_consumer": "the model input currently reading ['4',0] is repointed to the last LoraLoader's model output. That is node '10' (IPAdapterUnifiedLoader) when the IP-Adapter branch is present, else node '3' (KSampler) after the branch is stripped."
+    },
     "notes": "Node IDs are strings (ComfyUI API format). Links are [<node_id>, <output_index>] pairs."
   },
 

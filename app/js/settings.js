@@ -179,12 +179,19 @@ async function renderDoctor() {
     return;
   }
 
+  const actionFor = (name) => {
+    const n = (name || '').toLowerCase();
+    if (n.includes('comfyui')) { return `<button class="btn sm" data-act="comfyui">Start ComfyUI</button>`; }
+    if (n.includes('brain') || n.includes('ollama')) { return `<button class="btn sm" data-act="ollama">Start Ollama</button>`; }
+    return '';
+  };
   const rows = checks.map((c) => {
     if (c.ok) { return `<div class="check"><span class="ok">&#10003;</span> <div>${esc(c.name)}</div></div>`; }
     return `<div class="check"><span class="no">&#10007;</span> <div>
       <b>${esc(c.name)}</b>
       ${c.detail ? `<div class="faint">${esc(c.detail)}</div>` : ''}
       ${c.fix ? `<div style="margin-top:4px">${esc(c.fix)}</div>` : ''}
+      ${actionFor(c.name) ? `<div style="margin-top:6px">${actionFor(c.name)}</div>` : ''}
     </div></div>`;
   }).join('');
 
@@ -198,6 +205,16 @@ async function renderDoctor() {
       <div class="faint">No rush. Fix what you can, then press Re-check. Everything else keeps working.</div>
     </div>`;
   const rb = banner.querySelector('#docRecheck'); if (rb) { rb.onclick = renderDoctor; }
+  banner.querySelectorAll('[data-act]').forEach((b) => {
+    b.onclick = async () => {
+      b.disabled = true; b.textContent = 'Working...';
+      try {
+        const r = b.dataset.act === 'comfyui' ? await api.startComfyui() : await api.startOllama();
+        toast(r.detail || 'Done');
+        setTimeout(renderDoctor, 4000); // give it a moment to come up, then re-check
+      } catch (e) { toast('Could not start it: ' + e.message, 'bad'); b.disabled = false; b.textContent = 'Retry'; }
+    };
+  });
 }
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }

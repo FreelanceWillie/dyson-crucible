@@ -71,6 +71,10 @@ export const api = {
   qCancel: (id) => POST('/api/queue/cancel', { id }),
   qClear: () => POST('/api/queue/clear'),
   genStop: () => POST('/api/gen/stop'),
+  panic: () => POST('/api/panic'),
+  freeVram: () => POST('/api/vram/free'),
+  startComfyui: () => POST('/api/setup/start-comfyui'),
+  startOllama: () => POST('/api/setup/start-ollama'),
   // categories
   catNew: (path, parent, settings) => POST('/api/category/new', { path, parent, settings }),
   catUpdate: (path, settings) => POST('/api/category/update', { path, settings }),
