@@ -478,6 +478,169 @@ def step_resize(in_path, params, out_path):
     return out_path
 
 
+# --- stylized "looks" (retro / comic / fx / game-tech). All local, PIL + optional
+# numpy; a missing numpy step passes through unchanged so a chain never fails. ---
+
+def _np():
+    try:
+        import numpy as np  # type: ignore
+        return np
+    except Exception:
+        return None
+
+
+def _hex(h):
+    h = str(h).lstrip("#")
+    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+
+# A few classic game palettes (hex). Extend freely.
+PALETTES = {
+    "1bit": ["#000000", "#ffffff"],
+    "gameboy": ["#0f380f", "#306230", "#8bac0f", "#9bbc0f"],
+    "cga": ["#000000", "#55ffff", "#ff55ff", "#ffffff"],
+    "pico8": ["#000000", "#1d2b53", "#7e2553", "#008751", "#ab5236", "#5f574f",
+              "#c2c3c7", "#fff1e8", "#ff004d", "#ffa300", "#ffec27", "#00e436",
+              "#29adff", "#83769c", "#ff77a8", "#ffccaa"],
+    "nes": ["#000000", "#fcfcfc", "#f8f8f8", "#7c7c7c", "#a4e4fc", "#3cbcfc",
+            "#0078f8", "#0000fc", "#b8b8f8", "#6888fc", "#0058f8", "#0000bc",
+            "#f8b8f8", "#f878f8", "#e40058", "#a81000", "#f8d878", "#f8b800",
+            "#ac7c00", "#00b800", "#00a800", "#005800", "#b8f8b8", "#58d854"],
+}
+
+
+def step_dither(in_path, params, out_path):
+    """Floyd-Steinberg (default) or ordered dither to N colors. Retro look."""
+    from PIL import Image  # lazy
+    p = params or {}
+    colors = int(p.get("colors", 16))
+    d = Image.Dither.NONE if p.get("mode") == "ordered" else Image.Dither.FLOYDSTEINBERG
+    im = Image.open(in_path).convert("RGB")
+    im.quantize(colors=max(2, colors), dither=d).convert("RGB").save(out_path)
+    return out_path
+
+
+def step_pixelate(in_path, params, out_path):
+    """Pixel-art: downscale by pixel_size with nearest, optional palette snap, upscale back."""
+    from PIL import Image  # lazy
+    p = params or {}
+    px = max(1, int(p.get("pixel_size", 6)))
+    colors = int(p.get("colors", 0))
+    im = Image.open(in_path).convert("RGBA")
+    w, h = im.size
+    small = im.resize((max(1, w // px), max(1, h // px)), Image.NEAREST)
+    if colors > 0:
+        alpha = small.split()[3]
+        snapped = small.convert("RGB").quantize(colors=colors, dither=Image.Dither.NONE).convert("RGBA")
+        snapped.putalpha(alpha)
+        small = snapped
+    small.resize((w, h), Image.NEAREST).save(out_path)
+    return out_path
+
+
+def step_palette_map(in_path, params, out_path):
+    """Snap to a named preset palette (gameboy/pico8/nes/cga/1bit) or a custom hex list."""
+    from PIL import Image  # lazy
+    p = params or {}
+    hexes = p.get("colors_hex")
+    if not (isinstance(hexes, list) and hexes):
+        hexes = PALETTES.get(p.get("palette", "gameboy"), PALETTES["gameboy"])
+    pal = []
+    for hx in hexes:
+        pal += list(_hex(hx))
+    pal += [0] * (768 - len(pal))
+    palimg = Image.new("P", (1, 1))
+    palimg.putpalette(pal)
+    d = Image.Dither.FLOYDSTEINBERG if p.get("dither", True) else Image.Dither.NONE
+    Image.open(in_path).convert("RGB").quantize(palette=palimg, dither=d).convert("RGB").save(out_path)
+    return out_path
+
+
+def step_toon(in_path, params, out_path):
+    """Cel/cartoon: flatten to N colors and multiply dark edges over it."""
+    from PIL import Image, ImageFilter, ImageChops  # lazy
+    p = params or {}
+    colors = int(p.get("colors", 8))
+    thresh = int(p.get("edge", 30))
+    im = Image.open(in_path).convert("RGB")
+    flat = im.quantize(colors=colors, dither=Image.Dither.NONE).convert("RGB")
+    e = im.convert("L").filter(ImageFilter.FIND_EDGES).point(lambda v: 0 if v > thresh else 255)
+    ImageChops.multiply(flat, Image.merge("RGB", (e, e, e))).save(out_path)
+    return out_path
+
+
+def step_duotone(in_path, params, out_path):
+    """Map luminance to two colors (dark -> light). Stylish + cohesive."""
+    from PIL import Image  # lazy
+    p = params or {}
+    d = _hex(p.get("dark", "#22223b"))
+    l = _hex(p.get("light", "#f2e9e4"))
+    g = Image.open(in_path).convert("L")
+    lut = []
+    for ch in range(3):
+        lut += [int(d[ch] + (l[ch] - d[ch]) * i / 255) for i in range(256)]
+    Image.merge("RGB", (g, g, g)).point(lut).save(out_path)
+    return out_path
+
+
+def step_scanlines(in_path, params, out_path):
+    """CRT scanlines. params: gap, opacity."""
+    from PIL import Image, ImageDraw  # lazy
+    p = params or {}
+    gap = max(2, int(p.get("gap", 3)))
+    op = int(255 * float(p.get("opacity", 0.3)))
+    im = Image.open(in_path).convert("RGBA")
+    ov = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    dr = ImageDraw.Draw(ov)
+    for y in range(0, im.height, gap):
+        dr.line([(0, y), (im.width, y)], fill=(0, 0, 0, op))
+    Image.alpha_composite(im, ov).save(out_path)
+    return out_path
+
+
+def step_grain(in_path, params, out_path):
+    """Film grain. Needs numpy; passes through unchanged if absent."""
+    from PIL import Image  # lazy
+    np = _np()
+    if np is None:
+        Image.open(in_path).save(out_path)
+        return out_path
+    amt = float((params or {}).get("amount", 12))
+    im = Image.open(in_path).convert("RGB")
+    a = np.asarray(im).astype("int16")
+    noise = np.random.default_rng(1).normal(0, amt, a.shape)
+    Image.fromarray(np.clip(a + noise, 0, 255).astype("uint8")).save(out_path)
+    return out_path
+
+
+def step_chromatic(in_path, params, out_path):
+    """Chromatic aberration: shift red/blue channels. Cyberpunk/glitch."""
+    from PIL import Image, ImageChops  # lazy
+    sh = int((params or {}).get("shift", 3))
+    im = Image.open(in_path).convert("RGB")
+    r, g, b = im.split()
+    Image.merge("RGB", (ImageChops.offset(r, sh, 0), g, ImageChops.offset(b, -sh, 0))).save(out_path)
+    return out_path
+
+
+def step_normal_map(in_path, params, out_path):
+    """Derive a tangent-space normal map from the image (for 2.5D lighting).
+    Needs numpy; passes through unchanged if absent."""
+    from PIL import Image  # lazy
+    np = _np()
+    if np is None:
+        Image.open(in_path).save(out_path)
+        return out_path
+    strength = float((params or {}).get("strength", 2.0))
+    a = np.asarray(Image.open(in_path).convert("L")).astype("float32") / 255.0
+    gy, gx = np.gradient(a)
+    nx, ny, nz = -gx * strength, -gy * strength, np.ones_like(a)
+    ln = np.sqrt(nx * nx + ny * ny + nz * nz)
+    rgb = np.stack([(nx / ln) * 0.5 + 0.5, (ny / ln) * 0.5 + 0.5, (nz / ln) * 0.5 + 0.5], -1)
+    Image.fromarray((rgb * 255).astype("uint8")).save(out_path)
+    return out_path
+
+
 STEPS = {
     "trim": step_trim,
     "bg_remove": step_bg_remove,
@@ -489,6 +652,15 @@ STEPS = {
     "resize": step_resize,
     "outline": step_outline,
     "crop_square": step_crop_square,
+    "dither": step_dither,
+    "pixelate": step_pixelate,
+    "palette_map": step_palette_map,
+    "toon": step_toon,
+    "duotone": step_duotone,
+    "scanlines": step_scanlines,
+    "grain": step_grain,
+    "chromatic": step_chromatic,
+    "normal_map": step_normal_map,
     "vectorize": step_vectorize,
 }
 
@@ -539,6 +711,57 @@ _STEP_META = {
         "params": {"width": {"type": "int", "default": 512},
                    "height": {"type": "int", "default": 512},
                    "keep_aspect": {"type": "bool", "default": True}},
+        "changes_ext": None,
+    },
+    "dither": {
+        "description": "Retro dither to N colors (Floyd-Steinberg or ordered).",
+        "params": {"colors": {"type": "int", "default": 16},
+                   "mode": {"type": "str", "default": "floyd"}},
+        "changes_ext": None,
+    },
+    "pixelate": {
+        "description": "Pixel-art look: chunky pixels, optional palette snap.",
+        "params": {"pixel_size": {"type": "int", "default": 6},
+                   "colors": {"type": "int", "default": 0}},
+        "changes_ext": None,
+    },
+    "palette_map": {
+        "description": "Snap to a retro palette (gameboy, pico8, nes, cga, 1bit) or custom hex list.",
+        "params": {"palette": {"type": "str", "default": "gameboy"},
+                   "dither": {"type": "bool", "default": True}},
+        "changes_ext": None,
+    },
+    "toon": {
+        "description": "Cartoon / cel look: flat colors with dark edges.",
+        "params": {"colors": {"type": "int", "default": 8},
+                   "edge": {"type": "int", "default": 30}},
+        "changes_ext": None,
+    },
+    "duotone": {
+        "description": "Map brightness to two colors (dark to light).",
+        "params": {"dark": {"type": "str", "default": "#22223b"},
+                   "light": {"type": "str", "default": "#f2e9e4"}},
+        "changes_ext": None,
+    },
+    "scanlines": {
+        "description": "Retro CRT scanlines.",
+        "params": {"gap": {"type": "int", "default": 3},
+                   "opacity": {"type": "float", "default": 0.3}},
+        "changes_ext": None,
+    },
+    "grain": {
+        "description": "Film grain / noise texture.",
+        "params": {"amount": {"type": "float", "default": 12}},
+        "changes_ext": None,
+    },
+    "chromatic": {
+        "description": "Chromatic aberration (RGB shift), a glitch/cyberpunk look.",
+        "params": {"shift": {"type": "int", "default": 3}},
+        "changes_ext": None,
+    },
+    "normal_map": {
+        "description": "Turn the image into a normal map for 2.5D game lighting.",
+        "params": {"strength": {"type": "float", "default": 2.0}},
         "changes_ext": None,
     },
     "outline": {

@@ -70,6 +70,10 @@ postprocess:
     clean_png: [ {step: bg_remove}, {step: trim} ]
     game_sprite: [ {step: bg_remove}, {step: trim, params: {pad: 4}} ]  # transparent, tightly-cropped PNG ready to drop into a game
     hi_res: [ {step: upscale, params: {scale: 2}}, {step: trim} ]
+    gameboy: [ {step: pixelate, params: {pixel_size: 5}}, {step: palette_map, params: {palette: gameboy}} ]
+    pixel_sprite: [ {step: pixelate, params: {pixel_size: 4, colors: 32}}, {step: bg_remove}, {step: trim} ]
+    comic: [ {step: toon, params: {colors: 8}}, {step: outline, params: {width: 4}} ]
+    retro_crt: [ {step: scanlines}, {step: chromatic, params: {shift: 2}}, {step: grain, params: {amount: 8}} ]
 
 # --- Image generation (shared by both engines) ---
 gen:
