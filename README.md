@@ -7,9 +7,9 @@ You describe, rate, and pick. It runs entirely on your own Windows PC, no accoun
 <p align="center">
   <img src="docs/demo/warlock.png" width="30%" alt="An evil warlock, generated in the app">
   <img src="docs/demo/warlock_pixel.png" width="30%" alt="The same warlock as color pixel art">
-  <img src="docs/demo/warlock_vector.png" width="30%" alt="The same warlock as a clean vector sticker">
+  <img src="docs/demo/warlock_vector.png" width="30%" alt="The same warlock as clean reduced-color vector art">
 </p>
-<p align="center"><em>One prompt, generated locally on a home GPU, then restyled in the built-in look lab: the original render, elegant color pixel art, and a clean die-cut vector sticker, palette preserved. All made in the app.</em></p>
+<p align="center"><em>One prompt, generated locally on a home GPU, then restyled in the built-in look lab: the original render, elegant color pixel art, and clean reduced-color vector art (flat spot colors, screen-print ready). All made in the app.</em></p>
 
 ---
 
