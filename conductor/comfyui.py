@@ -54,6 +54,9 @@ def _base(url: str) -> str:
 # ---------------------------------------------------------------------------
 # Liveness + self-heal
 # ---------------------------------------------------------------------------
+_LAST_LAUNCH = 0.0  # epoch of our last ComfyUI launch (avoid double-launching)
+
+
 def is_up(url: str) -> bool:
     """Return True if a ComfyUI server answers /system_stats with HTTP 200."""
     if requests is None:
@@ -79,6 +82,18 @@ def ensure_up(cfg: Dict[str, Any]) -> bool:
     if is_up(url):
         return True
 
+    # Guard: if we launched ComfyUI recently, it may still be loading (cold start
+    # on a 4GB card is slow). Do NOT launch another instance -- that would fight
+    # for the port and both would crash (the 'window flashes' symptom). Just wait.
+    global _LAST_LAUNCH
+    if _LAST_LAUNCH and (time.time() - _LAST_LAUNCH) < 150:
+        deadline = time.time() + 120
+        while time.time() < deadline:
+            if is_up(url):
+                return True
+            time.sleep(2)
+        return False
+
     exe = (comfy.get("exe") or "").strip()
     if not exe:
         print(
@@ -91,39 +106,67 @@ def ensure_up(cfg: Dict[str, Any]) -> bool:
         print(f"[comfyui] configured launcher does not exist: {exe}")
         return False
 
+    log_path = _comfy_log_path()
     print(f"[comfyui] ComfyUI is down; launching: {exe}")
+    print(f"[comfyui] its output is being captured to: {log_path}")
     try:
-        # Launch detached & non-blocking. On Windows, DETACHED_PROCESS +
-        # a new process group keeps it alive independent of us and avoids
-        # inheriting our console. cwd = the launcher's own folder so relative
-        # paths inside a run_nvidia_gpu.bat resolve correctly.
+        # Capture ComfyUI's stdout+stderr to a log file so a startup CRASH is
+        # diagnosable (previously it went to DEVNULL and vanished -- the app then
+        # just saw 'not up' with no reason). Launch detached & non-blocking.
         creationflags = 0
         if os.name == "nt":
             # 0x00000008 DETACHED_PROCESS | 0x00000200 CREATE_NEW_PROCESS_GROUP
             creationflags = 0x00000008 | 0x00000200
+        logf = open(log_path, "w", encoding="utf-8", errors="replace")
         subprocess.Popen(
             [exe],
             cwd=os.path.dirname(exe) or None,
             shell=(os.name == "nt"),  # allow launching .bat on Windows
             creationflags=creationflags,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=logf,
+            stderr=subprocess.STDOUT,
             close_fds=(os.name != "nt"),
         )
+        _LAST_LAUNCH = time.time()
     except Exception as exc:  # noqa: BLE001
         print(f"[comfyui] failed to launch ComfyUI: {exc}")
         return False
 
-    # Poll for liveness up to ~60s.
-    deadline = time.time() + 60
+    # ComfyUI on a 4GB card can take a while to import + load; poll up to ~120s.
+    deadline = time.time() + 120
     while time.time() < deadline:
         if is_up(url):
             print("[comfyui] ComfyUI is up.")
             return True
         time.sleep(2)
 
-    print("[comfyui] timed out waiting for ComfyUI to come up (~60s).")
+    # Timed out. ComfyUI probably crashed on startup -- surface the tail of its
+    # log so the reason is visible in THIS console (and the Doctor).
+    print("[comfyui] timed out waiting for ComfyUI (~120s). It likely crashed on")
+    print("[comfyui] startup. Last lines of its log (" + log_path + "):")
+    for line in _tail(log_path, 25):
+        print("    [comfyui] " + line.rstrip())
     return False
+
+
+def _comfy_log_path() -> str:
+    """Where ComfyUI's captured output goes. Repo root if resolvable, else temp."""
+    try:
+        try:
+            import cfg as _cfg  # flat layout
+        except ImportError:
+            from conductor import cfg as _cfg  # type: ignore
+        return os.path.join(_cfg.REPO_ROOT, "comfyui_startup.log")
+    except Exception:
+        return os.path.join(tempfile.gettempdir(), "comfyui_startup.log")
+
+
+def _tail(path: str, n: int) -> List[str]:
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            return fh.readlines()[-n:]
+    except Exception:
+        return ["(could not read the log)"]
 
 
 # ---------------------------------------------------------------------------
