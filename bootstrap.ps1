@@ -2,11 +2,12 @@
 #  Art Conductor - one-click bootstrap installer (Windows, PowerShell 5.1 safe)
 # =====================================================================
 #  Run from the repo root:   .\bootstrap.ps1
+#  Optional: choose where ComfyUI installs:  .\bootstrap.ps1 -ComfyUIRoot "D:\AI\ComfyUI"
 #
 #  What it does, in order (see the [n/9] readout as it runs):
 #    1. Python venv + deps      (delegates to setup.ps1)
 #    2. Ollama app + model      (the local "brain")
-#    3. ComfyUI portable/clone  (the generation engine)  -> E:/Tools/ComfyUI
+#    3. ComfyUI portable/clone  (the generation engine)  -> a sibling ComfyUI folder
 #    4. IPAdapter_plus node
 #    5-8. Model files into ComfyUI/models/*
 #    9. Wire config.yaml (comfyui.root + comfyui.exe) and print "ready".
@@ -22,6 +23,8 @@
 #  native calls wrapped in try/catch, no '2>&1' on native exes.
 # =====================================================================
 
+param([string]$ComfyUIRoot = "")   # optional: where to install ComfyUI
+
 $ErrorActionPreference = "Continue"
 
 # ---------------------------------------------------------------------
@@ -30,7 +33,10 @@ $ErrorActionPreference = "Continue"
 # Portable: the repo is wherever this script lives. ComfyUI installs as a sibling
 # folder next to the repo by default (override with the DC_COMFYUI_ROOT env var).
 $RepoRoot     = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
-$ComfyUIRoot  = if ($env:DC_COMFYUI_ROOT) { $env:DC_COMFYUI_ROOT } else { Join-Path (Split-Path $RepoRoot -Parent) "ComfyUI" }
+# ComfyUI location: -ComfyUIRoot param > DC_COMFYUI_ROOT env var > a sibling folder.
+if (-not $ComfyUIRoot) {
+    $ComfyUIRoot = if ($env:DC_COMFYUI_ROOT) { $env:DC_COMFYUI_ROOT } else { Join-Path (Split-Path $RepoRoot -Parent) "ComfyUI" }
+}
 
 # ComfyUI standalone portable (official 7z on GitHub releases). If the
 # version tag moves, update this ONE line. "latest" release page:
