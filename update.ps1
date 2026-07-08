@@ -35,11 +35,13 @@ if ((Test-Path "config.yaml.bak") -and (Test-Path "config.yaml")) {
     }
 }
 
-# 2. Top up Python deps (setup.ps1 is idempotent).
-if (Test-Path (Join-Path $RepoRoot "setup.ps1")) {
-    Say "topping up Python dependencies..."
-    try { & (Join-Path $RepoRoot "setup.ps1") | Out-Null; Ok "deps current." }
-    catch { Warn "setup.ps1 had a problem; run it manually if something is missing." }
+# 2. Full idempotent assembly: run bootstrap (Python deps + ComfyUI + models +
+#    config). It skips anything already present, so this both APPLIES the update
+#    and FILLS a partial install (e.g. code was updated but ComfyUI/models were
+#    never installed -- exactly what happens if you only ever ran the deps step).
+if (Test-Path (Join-Path $RepoRoot "bootstrap.ps1")) {
+    Say "running the installer to top up code, engine, and models (idempotent)..."
+    try { & (Join-Path $RepoRoot "bootstrap.ps1") } catch { Warn "bootstrap had a problem; see the messages above." }
 }
 
 # 3. Re-apply custom-node patches for any installed feature-pack nodes (idempotent).
@@ -49,8 +51,10 @@ foreach ($cr in $ComfyRoots) {
                       (Join-Path $cr "ComfyUI/custom_nodes/ComfyUI-layerdiffuse"))) {
         if ((Test-Path $nd) -and (Test-Path $patch)) {
             Say "re-patching ComfyUI-layerdiffuse..."
-            $py = if (Test-Path (Join-Path $cr "python_embeded/python.exe")) { Join-Path $cr "python_embeded/python.exe" } else { "python" }
-            & $py $patch $nd
+            $repoVenvPy0 = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+            $py = if (Test-Path (Join-Path $cr "python_embeded/python.exe")) { Join-Path $cr "python_embeded/python.exe" }
+                  elseif (Test-Path $repoVenvPy0) { $repoVenvPy0 } else { $null }
+            if ($py) { & $py $patch $nd }
         }
     }
 }

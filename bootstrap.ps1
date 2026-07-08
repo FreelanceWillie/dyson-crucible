@@ -475,3 +475,10 @@ Write-Host "  Tip: your card has 4GB of VRAM. Keep image size at 512 and let"
 Write-Host "  ComfyUI run with --lowvram (already wired). SDXL is not recommended;"
 Write-Host "  stick with SD1.5."
 Write-Host ""
+
+# Mark the install as complete so the launcher knows it does not need to run
+# bootstrap again. A checkpoint present is our proxy for "the heavy install ran".
+$ckptOk = (Test-Path (Join-Path $CkptDir "DreamShaper_8_pruned.safetensors")) -or (Test-Path $CkptFile)
+if ($ckptOk) {
+    Set-Content -Path (Join-Path $RepoRoot ".dc_installed") -Value (Get-Date -Format "s") -Encoding ASCII
+}

@@ -7,7 +7,10 @@ REM  Double-click this file to install (first time) and run the app.
 REM  No commands to type. It opens in your web browser when ready.
 REM ---------------------------------------------------------------
 
-REM Install if the venv is missing OR incomplete (interrupted first run).
+REM Run the full installer unless everything is in place:
+REM  - .dc_installed marker (bootstrap finished, ComfyUI + models present)
+REM  - a working venv with the core deps importable
+if not exist ".dc_installed" goto :install
 if not exist ".venv\Scripts\python.exe" goto :install
 ".venv\Scripts\python.exe" -c "import yaml, PIL, requests" >nul 2>&1
 if errorlevel 1 goto :install
