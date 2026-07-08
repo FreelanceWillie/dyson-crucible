@@ -521,14 +521,32 @@ def step_dither(in_path, params, out_path):
 
 
 def step_pixelate(in_path, params, out_path):
-    """Pixel-art: downscale by pixel_size with nearest, optional palette snap, upscale back."""
-    from PIL import Image  # lazy
+    """Pixel-art: downscale by pixel_size, optional palette snap, upscale back.
+
+    `smooth` (default True) downscales with BOX (area-averaging) + a light median
+    pre-filter so busy/noisy source detail collapses into clean flat blocks
+    instead of speckled confetti. This is what makes the result read as NATIVE
+    pixel art rather than a fuzzy shrunk photo. Set smooth=False for the old
+    nearest-neighbour behaviour. A LIMITED `colors` palette (e.g. 16-24) also
+    matters a lot: the default now snaps to 24 so the look is intentional."""
+    from PIL import Image, ImageFilter  # lazy
     p = params or {}
-    px = max(1, int(p.get("pixel_size", 6)))
-    colors = int(p.get("colors", 0))
+    px = max(1, int(p.get("pixel_size", 8)))
+    colors = int(p.get("colors", 24))
+    smooth = bool(p.get("smooth", True))
     im = Image.open(in_path).convert("RGBA")
     w, h = im.size
-    small = im.resize((max(1, w // px), max(1, h // px)), Image.NEAREST)
+    if smooth:
+        # Median-filter the RGB (kills single-pixel speckle) then area-average
+        # downscale so each output pixel is a true block average, not one sample.
+        rgb = im.convert("RGB").filter(ImageFilter.MedianFilter(3))
+        alpha = im.split()[3]
+        small_rgb = rgb.resize((max(1, w // px), max(1, h // px)), Image.BOX)
+        small_a = alpha.resize((max(1, w // px), max(1, h // px)), Image.BOX)
+        small = small_rgb.convert("RGBA")
+        small.putalpha(small_a)
+    else:
+        small = im.resize((max(1, w // px), max(1, h // px)), Image.NEAREST)
     if colors > 0:
         alpha = small.split()[3]
         snapped = small.convert("RGB").quantize(colors=colors, dither=Image.Dither.NONE).convert("RGBA")
@@ -844,9 +862,11 @@ _STEP_META = {
         "changes_ext": None,
     },
     "pixelate": {
-        "description": "Pixel-art look: chunky pixels, optional palette snap.",
-        "params": {"pixel_size": {"type": "int", "default": 6},
-                   "colors": {"type": "int", "default": 0}},
+        "description": "Native pixel-art look: area-averaged chunky pixels with a "
+                       "limited palette (smooth=True avoids fuzzy confetti).",
+        "params": {"pixel_size": {"type": "int", "default": 8},
+                   "colors": {"type": "int", "default": 24},
+                   "smooth": {"type": "bool", "default": True}},
         "changes_ext": None,
     },
     "palette_map": {
