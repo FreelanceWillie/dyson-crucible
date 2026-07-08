@@ -21,7 +21,7 @@ import sys
 import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, unquote
 
 # ---------------------------------------------------------------------------
 # Import the sibling modules. We support being run both as a package
@@ -309,7 +309,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         try:
             parsed = urlparse(self.path)
-            path = parsed.path
+            # Percent-decode so paths with spaces / unicode (e.g. an asset named
+            # "evil warlock" -> /outputs/evil%20warlock/...) resolve to real files.
+            path = unquote(parsed.path)
 
             if path == "/" or path == "/index.html":
                 fp = os.path.join(APP_DIR, "index.html")
