@@ -73,17 +73,30 @@ function Set-ComfyConfig($configPath, $root, $launcher) {
 # Launch ComfyUI via the launcher, poll its API, then stop it. Returns $true if it
 # came up. Proves the engine actually works (not just that files exist).
 function Test-ComfyLaunch($launcher) {
-    Write-Host "      Test-launching ComfyUI (up to ~90s the first time)..."
+    Write-Host "      Test-launching ComfyUI. First time is slow (imports + nodes)."
+    $log = Join-Path $env:TEMP "dc_comfy_verify.log"
+    if (Test-Path $log) { Remove-Item $log -Force -ErrorAction SilentlyContinue }
     $proc = $null
-    try { $proc = Start-Process -FilePath $launcher -PassThru -WindowStyle Minimized } catch { return $false }
+    # Capture the engine's output so we can show WHAT it is doing while it loads.
+    try { $proc = Start-Process -FilePath $launcher -PassThru -WindowStyle Minimized -RedirectStandardOutput $log -RedirectStandardError $log } catch {
+        try { $proc = Start-Process -FilePath $launcher -PassThru -WindowStyle Minimized } catch { return $false }
+    }
     $ok = $false
-    for ($i = 0; $i -lt 45; $i++) {
-        Start-Sleep -Seconds 2
+    $spin = @('|', '/', '-', '\'); $t0 = Get-Date
+    for ($i = 0; $i -lt 120; $i++) {   # up to ~4 min, plenty for a weak 4GB laptop
         try {
             $r = Invoke-WebRequest "http://127.0.0.1:8188/system_stats" -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
             if ($r.StatusCode -eq 200) { $ok = $true; break }
         } catch {}
+        # live status line: spinner + elapsed + the last thing ComfyUI printed
+        $secs = [int]((Get-Date) - $t0).TotalSeconds
+        $last = ""
+        try { if (Test-Path $log) { $last = (Get-Content $log -Tail 1 -ErrorAction SilentlyContinue) } } catch {}
+        if ($last.Length -gt 70) { $last = $last.Substring(0, 70) }
+        Write-Host ("`r      $($spin[$i % 4]) waiting for ComfyUI  ${secs}s   $last".PadRight(110)) -NoNewline
+        Start-Sleep -Seconds 2
     }
+    Write-Host ""   # end the status line
     # Stop the test instance; the app relaunches ComfyUI itself when it needs it.
     try {
         $cons = Get-NetTCPConnection -LocalPort 8188 -State Listen -ErrorAction SilentlyContinue

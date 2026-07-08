@@ -37,7 +37,12 @@ function renderQueue() {
     if (j.status === 'running') {
       lead = (typeof j.pct === 'number' ? ring(j.pct) : '<span class="spinner" style="display:inline-block;vertical-align:middle"></span>') + ' ';
       if (typeof j.eta === 'number') { tail = ` <span class="faint">~${fmtSecs(j.eta)} left</span>`; }
-      else if (typeof j.elapsed === 'number') { tail = ` <span class="faint">${fmtSecs(j.elapsed)}</span>`; }
+      else if (typeof j.elapsed === 'number') {
+        // no learned duration yet (first/cold run): set expectations so it does not
+        // look frozen -- the engine + model load take a minute or two the first time.
+        const warm = j.elapsed > 12 ? ' <span class="faint">warming up the engine (first run ~1-2 min)</span>' : '';
+        tail = ` <span class="faint">${fmtSecs(j.elapsed)}</span>${warm}`;
+      }
     }
     // failed job -> a "why?" link that reveals the captured error
     let why = '';

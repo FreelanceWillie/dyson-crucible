@@ -83,28 +83,47 @@ def _pids_on_port(port: int) -> List[int]:
     return list(pids)
 
 
-def _reap_stale_comfyui(url: str, grace: int = 40) -> bool:
-    """If something holds the ComfyUI port but does not answer, give it a short
-    grace (it may be loading), then kill it so a single healthy instance can start.
-    Returns True if it killed a stale process."""
+def _reap_stale_comfyui(url: str, min_grace: int = 20, stale_after: int = 30,
+                        hard_cap: int = 240) -> bool:
+    """Reap a ComfyUI that holds the port but never becomes healthy -- WITHOUT
+    false-killing a slow-loading one on weak hardware.
+
+    ComfyUI writes to its startup log continuously while it loads (imports, nodes),
+    so we treat a GROWING log as 'making progress' and keep waiting; we only kill it
+    once the log goes STALE (no writes) while still not answering -- i.e. it is hung
+    or crashed, not just slow. This adapts to any hardware instead of a fixed 40s.
+    Returns True if it killed a process."""
     port = _port_from_url(url)
     if not _pids_on_port(port):
         return False
-    # grace: maybe it is a legit instance still loading
-    deadline = time.time() + grace
-    while time.time() < deadline:
+    logp = _comfy_log_path()
+    start = time.time()
+    while time.time() - start < hard_cap:
         if is_up(url):
-            return False
-        time.sleep(2)
-    # still unresponsive + holding the port -> stale. Kill it.
+            return False  # became healthy -> never touch it
+        elapsed = time.time() - start
+        # still making progress? (log written recently) -> keep waiting
+        log_fresh = False
+        try:
+            if os.path.isfile(logp):
+                log_fresh = (time.time() - os.path.getmtime(logp)) < stale_after
+        except Exception:
+            pass
+        if elapsed < min_grace or log_fresh:
+            if int(elapsed) % 10 == 0:
+                print(f"[comfyui] waiting for ComfyUI to come up ({int(elapsed)}s; still loading)...")
+            time.sleep(3)
+            continue
+        break  # unresponsive AND log stale -> hung/crashed
+    if is_up(url):
+        return False
     killed = False
     try:
         import psutil
         for pid in _pids_on_port(port):
             try:
-                p = psutil.Process(pid)
-                print(f"[comfyui] reaping unresponsive ComfyUI on port {port} (pid {pid})")
-                p.kill()
+                psutil.Process(pid).kill()
+                print(f"[comfyui] reaped a stuck ComfyUI on port {port} (pid {pid}); starting a fresh one")
                 killed = True
             except Exception:
                 pass
