@@ -139,7 +139,21 @@ function Verify-Comfy($root, $repoRoot, $configPath) {
         return $true
     }
     Write-Host "      ComfyUI is installed but did not respond when launched." -ForegroundColor Red
-    Write-Host "      Most common cause: GPU driver / torch mismatch. The app's Doctor" -ForegroundColor Red
-    Write-Host "      panel will show the exact error; try its 'Start ComfyUI' button." -ForegroundColor Red
+    # Save ComfyUI's own output to ONE obvious file so the reason is not lost in the
+    # scrollback (the update keeps going after this).
+    $errFile = Join-Path $repoRoot "comfyui_error.txt"
+    try {
+        $blocks = @("=== ComfyUI failed to start. Its last output: ===")
+        foreach ($f in @((Join-Path $env:TEMP "dc_comfy_verify.err.log"),
+                         (Join-Path $env:TEMP "dc_comfy_verify.out.log"))) {
+            if ((Test-Path $f) -and ((Get-Item $f).Length -gt 0)) {
+                $blocks += "`n--- $(Split-Path $f -Leaf) ---"
+                $blocks += (Get-Content $f -Tail 60 -ErrorAction SilentlyContinue)
+            }
+        }
+        Set-Content -Path $errFile -Value $blocks -Encoding UTF8
+        Write-Host "      >>> The exact error was saved to:  $errFile" -ForegroundColor Yellow
+        Write-Host "      >>> Open that file (or run Diagnostics.bat) and send it for a fix." -ForegroundColor Yellow
+    } catch {}
     return $false
 }
