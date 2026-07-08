@@ -428,6 +428,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(_version_info())
             return
 
+        if path == "/api/diagnostics":
+            self._send_json({"text": self._diagnostics(conf, paths)})
+            return
+
         if path == "/api/poses":
             try:
                 import animate as animmod
@@ -1474,6 +1478,79 @@ class Handler(BaseHTTPRequestHandler):
         else:
             add("GPU", False, "no NVIDIA GPU detected", "Generation will run on CPU (slow but works).")
         return checks
+
+    def _diagnostics(self, conf, paths):
+        """One copy-pasteable block with everything a helper needs: versions,
+        config, ComfyUI status + its startup log tail, recent job errors, GPU."""
+        import platform
+        L = []
+        def line(s=""):
+            L.append(s)
+        line("=== Dyson Crucible diagnostics ===")
+        try:
+            line("version: " + str(_version_info().get("version")))
+        except Exception:
+            pass
+        line("platform: %s | python: %s" % (platform.platform(), sys.version.split()[0]))
+        comfy = (conf.get("comfyui") or {}) if isinstance(conf, dict) else {}
+        gen = (conf.get("gen") or {}) if isinstance(conf, dict) else {}
+        line("engine: %s | checkpoint: %s" % (conf.get("engine"), comfy.get("checkpoint")))
+        line("comfyui.root: %s" % (comfy.get("root") or "(unset)"))
+        line("comfyui.exe:  %s" % (comfy.get("exe") or "(unset)"))
+        line("gen size: %sx%s  transparent: %s" % (gen.get("width"), gen.get("height"), gen.get("transparent")))
+
+        # ComfyUI reachability
+        line("")
+        try:
+            import comfyui as _cf
+            url = comfy.get("url", "http://127.0.0.1:8188")
+            line("ComfyUI reachable: %s (%s)" % (_cf.is_up(url), url))
+        except Exception as exc:
+            line("ComfyUI check error: %s" % exc)
+
+        # GPU
+        try:
+            gpu = resmod.snapshot().get("gpu")
+            if gpu:
+                line("GPU: %s  VRAM %sMB" % (gpu.get("name"), gpu.get("vram_total_mb")))
+        except Exception:
+            pass
+
+        # Feature packs
+        try:
+            st = capmod.status(conf)
+            line("packs: " + ", ".join("%s=%s" % (k, "on" if v.get("installed") else "off") for k, v in st.items()))
+        except Exception:
+            pass
+
+        # Recent failed jobs + their errors (the actual reasons gen failed)
+        line("")
+        line("--- recent job failures ---")
+        try:
+            fails = [j for j in (jobs.list_jobs() or []) if j.get("status") == "failed" and j.get("error")]
+            if not fails:
+                line("(none)")
+            for j in fails[-5:]:
+                line("[%s:%s] %s" % (j.get("kind"), j.get("asset"), str(j.get("error"))[:600]))
+        except Exception as exc:
+            line("(could not read jobs: %s)" % exc)
+
+        # ComfyUI startup log tail (why it crashed on launch, if it did)
+        line("")
+        line("--- comfyui_startup.log (tail) ---")
+        try:
+            logp = os.path.join(cfg.REPO_ROOT, "comfyui_startup.log")
+            if os.path.isfile(logp):
+                with open(logp, "r", encoding="utf-8", errors="replace") as fh:
+                    tail = fh.readlines()[-30:]
+                for t in tail:
+                    line(t.rstrip())
+            else:
+                line("(no log yet - ComfyUI has not been launched by the app)")
+        except Exception as exc:
+            line("(could not read comfyui log: %s)" % exc)
+
+        return "\n".join(L)
 
     # -- shared builders ----------------------------------------------------
     def _enqueue_gen(self, conf, paths, name):

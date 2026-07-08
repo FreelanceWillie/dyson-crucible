@@ -82,6 +82,7 @@ export const api = {
   // animation
   version: () => GET('/api/version'),
   update: () => POST('/api/update'),
+  diagnostics: () => GET('/api/diagnostics'),
   poses: () => GET('/api/poses'),
   animate: (payload) => POST('/api/animate', payload),
   animateResult: (job) => GET('/api/animate/result?' + qs({ job })),
