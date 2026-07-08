@@ -362,6 +362,33 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"checks": self._doctor(conf, paths)})
             return
 
+        if path == "/api/animate/result":
+            jid = (query.get("job") or [""])[0]
+            job = None
+            for j in self._jobs_list():
+                if j.get("id") == jid:
+                    job = j; break
+            if not job:
+                self._send_json({"status": "none"}); return
+            urls = []
+            for p in (job.get("result") or []):
+                u = self._fs_to_url(paths, p)
+                if u:
+                    urls.append(u)
+            self._send_json({"status": job.get("status"), "error": job.get("error"), "urls": urls})
+            return
+
+        if path == "/api/poses":
+            try:
+                import animate as animmod
+                poses = animmod.list_poses()
+                for p in poses:
+                    p["url"] = "/app/poses/" + os.path.basename(p["path"])
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500); return
+            self._send_json({"poses": poses})
+            return
+
         if path == "/api/capabilities":
             try:
                 st = capmod.status(conf)
@@ -438,6 +465,43 @@ class Handler(BaseHTTPRequestHandler):
     def _handle_post_api(self, path, data):
         conf = _cfg()
         paths = _paths(conf)
+
+        if path == "/api/animate":
+            mode = (data.get("mode") or "keyframes").strip()
+            asset = (data.get("asset") or "animation").strip()
+            params = {
+                "mode": mode,
+                "prompt": data.get("prompt") or "",
+                "negative": data.get("negative") or "",
+                "out_dir": os.path.join(paths.get("outputs", "outputs"), asset, mode),
+                "seed": int(data.get("seed") or (42 if mode == "keyframes" else 7)),
+            }
+            if mode == "idle":
+                params.update({"frames": int(data.get("frames") or 16),
+                               "size": int(data.get("size") or 512),
+                               "fps": int(data.get("fps") or 8)})
+            else:
+                hero = (data.get("hero") or "").strip()
+                if not hero:
+                    self._send_json({"error": "keyframes mode needs a hero reference image"}, 400); return
+                # accept a servable url (/outputs/.., /references/..) -> disk path
+                for pref, key in (("/outputs/", "outputs"), ("/references/", "references"),
+                                  ("/vectors/", "vectors")):
+                    if hero.startswith(pref):
+                        hero = os.path.join(paths.get(key, key), hero[len(pref):].replace("/", os.sep))
+                        break
+                if not os.path.isfile(hero):
+                    self._send_json({"error": "hero image not found: " + hero}, 400); return
+                params.update({"hero": hero,
+                               "poses": data.get("poses") or ["idle"],
+                               "identity": float(data.get("identity") or 0.7),
+                               "pose_strength": float(data.get("pose_strength") or 1.0)})
+            try:
+                job = jobs.enqueue(asset, "animate", params)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 400); return
+            self._send_json({"ok": True, "job": job, "out_dir": params["out_dir"]})
+            return
 
         if path == "/api/capabilities/install":
             group = (data.get("group") or "").strip()

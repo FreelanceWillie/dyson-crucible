@@ -15,7 +15,9 @@ You describe, rate, and pick. It runs entirely on your own Windows PC, no accoun
 
 ## Features
 
-- **Three ways to start.** *New Hero* (you know what you want), *Surprise Me* (a vague phrase becomes a mood board of wildly different takes to cherry-pick), *Find a Style* (no idea yet, rate images 1 to 5 stars and it steers toward your taste, then saves the look).
+- **Four ways to start.** *New Hero* (you know what you want), *Surprise Me* (a vague phrase becomes a mood board of wildly different takes to cherry-pick), *Find a Style* (no idea yet, rate images 1 to 5 stars and it steers toward your taste, then saves the look), and *Animate*.
+- **Animate a hero.** *Pose frames*: pick a hero and a set of poses (idle/walk/run/attack/cast/cheer) and it renders that same character in each one, keeping identity (IP-Adapter) while controlling the pose (ControlNet). *Idle loop*: describe an ambient motion and get a short looping GIF (AnimateDiff). Fully local; see [docs/ANIMATION.md](docs/ANIMATION.md) for the 4GB VRAM budget.
+- **Feature packs.** Optional extras (native transparent generation, pose/animation, AI upscale) download on demand: one-click Unlock in Settings, or auto-installed the first time you use the feature. The core install stays small.
 - **Style matching.** Your reference images steer generation (IP-Adapter) and rank the results (CLIP), so output looks like your art and the best rise to the top.
 - **Chat control.** "More armor, less blue" and it redraws. A control-panel chat runs commands and answers how-to questions. Brain defaults to a local Ollama model; a free Gemini key or the `claude` CLI work too.
 - **Categories** that pass a shared look down to every hero inside them.

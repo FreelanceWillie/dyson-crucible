@@ -79,6 +79,10 @@ export const api = {
   // optional feature-group installers (unlock on demand)
   capabilities: () => GET('/api/capabilities'),
   installCapability: (group) => POST('/api/capabilities/install', { group }),
+  // animation
+  poses: () => GET('/api/poses'),
+  animate: (payload) => POST('/api/animate', payload),
+  animateResult: (job) => GET('/api/animate/result?' + qs({ job })),
   // categories
   catNew: (path, parent, settings) => POST('/api/category/new', { path, parent, settings }),
   catUpdate: (path, settings) => POST('/api/category/update', { path, settings }),

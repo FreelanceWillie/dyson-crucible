@@ -19,6 +19,7 @@ function render() {
         <button class="card entry" data-e="new"><div style="font-size:26px">&#127917;</div><b>New Hero</b><div class="faint">You know the style and character.</div></button>
         <button class="card entry" data-e="surprise"><div style="font-size:26px">&#10024;</div><b>Surprise Me</b><div class="faint">A vague idea, many different takes.</div></button>
         <button class="card entry" data-e="find"><div style="font-size:26px">&#128302;</div><b>Find a Style</b><div class="faint">No idea yet. Rate until a look emerges.</div></button>
+        <button class="card entry" data-e="animate"><div style="font-size:26px">&#127916;</div><b>Animate</b><div class="faint">Pose a hero into frames, or make an idle loop.</div></button>
       </div>
       <div>
         <div class="h">Your heroes</div>
@@ -40,6 +41,7 @@ function render() {
 function entry(kind) {
   if (kind === 'surprise') { setView('explore'); return; }
   if (kind === 'find') { setView('taste'); return; }
+  if (kind === 'animate') { setView('animate'); return; }
   // new hero
   const name = prompt('Name this hero (short id, e.g. frost_knight):');
   if (!name) { return; }

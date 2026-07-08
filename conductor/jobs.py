@@ -96,8 +96,8 @@ def _save(jobs: List[Dict[str, Any]]) -> None:
 # ---------------------------------------------------------------------------
 def enqueue(asset: str, kind: str, params: Optional[Dict[str, Any]] = None) -> str:
     """Append a new queued job and return its id."""
-    if kind not in ("gen", "vector", "explore", "post"):
-        raise ValueError(f"unknown job kind: {kind!r} (expected gen, vector, explore, or post)")
+    if kind not in ("gen", "vector", "explore", "post", "animate"):
+        raise ValueError(f"unknown job kind: {kind!r} (expected gen, vector, explore, post, or animate)")
     jobs = _load()
     job_id = uuid.uuid4().hex
     job = {
@@ -301,6 +301,36 @@ def _dispatch(job: Dict[str, Any], cfg: Dict[str, Any]) -> List[str]:
         except Exception as exc:  # noqa: BLE001
             print(f"[jobs] ranking skipped ({exc})")
         return paths
+
+    if kind == "animate":
+        import animate as _animate  # lazy: ComfyUI client + capabilities
+
+        mode = params.get("mode") or "keyframes"
+        out_dir = params.get("out_dir") or os.path.join(_cfg.path("outputs"), asset)
+        prompt = params.get("prompt") or ""
+        negative = params.get("negative") or ""
+        if mode == "idle":
+            res = _animate.idle(prompt, cfg, out_dir,
+                                frames=int(params.get("frames", 16)),
+                                size=int(params.get("size", 512)),
+                                seed=int(params.get("seed", 7)),
+                                negative=negative, fps=int(params.get("fps", 8)),
+                                log=print)
+            # return frames + gif so the UI can show both (gif first if present)
+            out = list(res.get("frames") or [])
+            if res.get("gif"):
+                out = [res["gif"]] + out
+            return out
+        # keyframes
+        hero = params.get("hero")
+        if not hero:
+            raise RuntimeError("animate keyframes needs params['hero'] (a reference image path)")
+        poses = params.get("poses") or ["idle"]
+        return _animate.keyframes(hero, poses, prompt, cfg, out_dir,
+                                  negative=negative,
+                                  identity=float(params.get("identity", 0.7)),
+                                  pose_strength=float(params.get("pose_strength", 1.0)),
+                                  seed=int(params.get("seed", 42)), log=print)
 
     if kind == "vector":
         import vectorize as _vectorize  # lazy
