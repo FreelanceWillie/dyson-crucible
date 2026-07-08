@@ -5,11 +5,11 @@
 You describe, rate, and pick. It runs entirely on your own Windows PC, no accounts, no subscriptions, nothing sent to the cloud. Local ComfyUI does the drawing, a local LLM is the "brain" that turns your notes into better prompts, and it learns your look from a few reference images.
 
 <p align="center">
-  <img src="docs/demo/warlock.png" width="30%" alt="A cute evil warlock, generated in the app">
-  <img src="docs/demo/warlock_pixel.png" width="30%" alt="The same warlock as low-bit pixel art">
-  <img src="docs/demo/warlock_vector.png" width="30%" alt="The same warlock as cartoony vector art">
+  <img src="docs/demo/warlock.png" width="30%" alt="An evil warlock, generated in the app">
+  <img src="docs/demo/warlock_pixel.png" width="30%" alt="The same warlock as color pixel art">
+  <img src="docs/demo/warlock_vector.png" width="30%" alt="The same warlock as a clean vector sticker">
 </p>
-<p align="center"><em>One prompt, generated locally on a home GPU, then restyled in the built-in look lab: realistic, low-bit pixel art, cartoony vector. All made in the app.</em></p>
+<p align="center"><em>One prompt, generated locally on a home GPU, then restyled in the built-in look lab: the original render, elegant color pixel art, and a clean die-cut vector sticker, palette preserved. All made in the app.</em></p>
 
 ---
 
