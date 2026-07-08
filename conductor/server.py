@@ -46,6 +46,52 @@ except Exception:  # pragma: no cover - fallback for loose-script execution
     import capabilities as capmod  # type: ignore
 
 
+import subprocess as _subprocess
+
+
+def _git(args, timeout=120):
+    """Run a git command in the repo root; return (ok, stdout+stderr)."""
+    try:
+        r = _subprocess.run(["git"] + args, cwd=cfg.REPO_ROOT, capture_output=True,
+                            text=True, timeout=timeout)
+        return r.returncode == 0, (r.stdout or "") + (r.stderr or "")
+    except Exception as e:
+        return False, str(e)
+
+
+def _version_info():
+    """Current commit + whether the remote is ahead (an update is available)."""
+    ok, head = _git(["rev-parse", "--short", "HEAD"])
+    info = {"version": head.strip() if ok else "unknown", "update_available": False, "behind": 0}
+    okd, desc = _git(["log", "-1", "--format=%cd", "--date=short"])
+    if okd:
+        info["date"] = desc.strip()
+    # fetch quietly, then count commits we are behind origin
+    _git(["fetch", "--quiet"], timeout=30)
+    okc, cnt = _git(["rev-list", "--count", "HEAD..@{u}"])
+    if okc and cnt.strip().isdigit():
+        info["behind"] = int(cnt.strip())
+        info["update_available"] = int(cnt.strip()) > 0
+    return info
+
+
+def _run_update():
+    """Pull latest (autostash preserves local config edits). App restart applies it."""
+    before_ok, before = _git(["rev-parse", "--short", "HEAD"])
+    ok, out = _git(["pull", "--autostash", "--no-edit"], timeout=180)
+    after_ok, after = _git(["rev-parse", "--short", "HEAD"])
+    changed = before_ok and after_ok and before.strip() != after.strip()
+    return {
+        "ok": ok,
+        "changed": changed,
+        "from": before.strip(), "to": after.strip(),
+        "log": out.strip()[-2000:],
+        "restart_required": changed,
+        "note": ("Updated. Restart the app to apply (and re-run update.ps1 if a "
+                 "feature-pack node needs its patch)." if changed else "Already up to date."),
+    }
+
+
 # Background feature-group installs: {group_id: {"log": [str], "done": bool, "ok": bool}}
 _CAP_PROGRESS = {}
 _CAP_LOCK = threading.Lock()
@@ -378,6 +424,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"status": job.get("status"), "error": job.get("error"), "urls": urls})
             return
 
+        if path == "/api/version":
+            self._send_json(_version_info())
+            return
+
         if path == "/api/poses":
             try:
                 import animate as animmod
@@ -465,6 +515,10 @@ class Handler(BaseHTTPRequestHandler):
     def _handle_post_api(self, path, data):
         conf = _cfg()
         paths = _paths(conf)
+
+        if path == "/api/update":
+            self._send_json(_run_update())
+            return
 
         if path == "/api/animate":
             mode = (data.get("mode") or "keyframes").strip()

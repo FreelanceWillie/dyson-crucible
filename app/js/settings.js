@@ -133,6 +133,12 @@ async function renderSettings() {
         <label class="row" style="gap:8px"><input type="checkbox" id="prefNotify" ${prefs.notifyDone ? 'checked' : ''}> <span>Notify when a batch is done</span></label>
       </div>
 
+      <div class="h">Updates</div>
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div class="col" style="gap:2px"><span id="verLine" class="faint">Checking version...</span></div>
+        <button class="btn sm" id="btnUpdate">Check for updates</button>
+      </div>
+
       <div class="h">Feature packs</div>
       <div class="faint">Optional extras. Download only what you want, when you want it.</div>
       <div class="col" id="featurePacks" style="gap:10px"><div class="faint">Checking...</div></div>
@@ -162,6 +168,35 @@ async function renderSettings() {
   box.querySelector('#setTutorial').onclick = () => { close(); emit('open', 'tutorial'); };
 
   renderFeaturePacks(box);
+  renderVersion(box);
+}
+
+// ----- updates ---------------------------------------------------------------
+async function renderVersion(box) {
+  const line = box.querySelector('#verLine');
+  const btn = box.querySelector('#btnUpdate');
+  if (!line || !btn) { return; }
+  let v;
+  try { v = await api.version(); } catch (_) { line.textContent = 'Version check unavailable.'; return; }
+  const base = 'Version ' + (v.version || '?') + (v.date ? ' (' + v.date + ')' : '');
+  if (v.update_available) {
+    line.innerHTML = base + ` <span class="chip" style="color:var(--accent);border-color:var(--accent)">${v.behind} update(s) available</span>`;
+    btn.textContent = 'Update now';
+  } else {
+    line.textContent = base + ' - up to date';
+  }
+  btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = 'Updating...';
+    let r;
+    try { r = await api.update(); } catch (e) { toast('Update failed: ' + e.message, 'bad'); btn.disabled = false; btn.textContent = 'Update now'; return; }
+    if (r.changed) {
+      line.innerHTML = `Updated ${r.from} &rarr; ${r.to}. <b>Restart the app to apply.</b>`;
+      toast('Updated. Restart the app to apply.', 'good');
+    } else {
+      toast('Already up to date.', 'good');
+      btn.disabled = false; btn.textContent = 'Check for updates';
+    }
+  };
 }
 
 // ----- feature packs (optional capability groups) ----------------------------

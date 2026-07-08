@@ -80,6 +80,8 @@ export const api = {
   capabilities: () => GET('/api/capabilities'),
   installCapability: (group) => POST('/api/capabilities/install', { group }),
   // animation
+  version: () => GET('/api/version'),
+  update: () => POST('/api/update'),
   poses: () => GET('/api/poses'),
   animate: (payload) => POST('/api/animate', payload),
   animateResult: (job) => GET('/api/animate/result?' + qs({ job })),
