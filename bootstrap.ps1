@@ -491,6 +491,12 @@ if ($ckptOk -and $comfyOk) {
     Set-Content -Path (Join-Path $RepoRoot ".dc_installed") -Value (Get-Date -Format "s") -Encoding ASCII
     Ok "Install verified end to end."
 } else {
+    # REMOVE a stale marker: if a previous run wrote it but this install is not
+    # actually working, the launcher must re-run bootstrap (heal) instead of
+    # trusting a stale 'installed' flag and starting a broken app.
+    $mk = Join-Path $RepoRoot ".dc_installed"
+    if (Test-Path $mk) { Remove-Item $mk -Force -ErrorAction SilentlyContinue }
     Warn "Install not fully verified (checkpoint=$ckptOk, comfyui=$comfyOk)."
-    Warn "Double-click the launcher again to let it finish/heal, or check the messages above."
+    Warn "Cleared the 'installed' marker so the launcher will heal it next time."
+    Warn "Double-click the launcher again to finish/heal, or check the messages above."
 }
