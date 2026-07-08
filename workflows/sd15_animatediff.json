@@ -1,0 +1,19 @@
+{
+  "_doc": {
+    "purpose": "Short looping idle animation (ambient motion) via AnimateDiff.",
+    "how": "ADE_AnimateDiffLoaderGen1 patches the model with the motion module; a uniform context with closed_loop makes the batch loop seamlessly; KSampler renders all frames; VHS_VideoCombine writes a GIF.",
+    "requires": "The 'animate' feature pack (capabilities.py): ComfyUI-AnimateDiff-Evolved + ComfyUI-VideoHelperSuite nodes + mm_sd_v15_v2.ckpt motion module.",
+    "vram": "MEASURED peak (RTX 2080, lowvram): 16f@512=6.4GB, 8f@512=5.2GB, 8f@384=4.7GB. All exceed 4GB, so on a 4GB card AnimateDiff runs via lowvram paging to system RAM (works but slow). Keep frames low and size <=384 on 4GB.",
+    "injected_by_gen_py": "4 ckpt_name; 6/7 prompt; 5 width/height/batch_size(frames); 51 context_length (match frames); 3 seed/steps/cfg; 60 frame_rate.",
+    "verified": "Ran end-to-end; produced a looping GIF."
+  },
+  "4":  {"class_type":"CheckpointLoaderSimple","inputs":{"ckpt_name":"DreamShaper_8_pruned.safetensors"}},
+  "51": {"class_type":"ADE_AnimateDiffUniformContextOptions","inputs":{"context_length":16,"context_stride":1,"context_overlap":4,"context_schedule":"uniform","closed_loop":true}},
+  "50": {"class_type":"ADE_AnimateDiffLoaderGen1","inputs":{"model":["4",0],"model_name":"mm_sd_v15_v2.ckpt","beta_schedule":"sqrt_linear (AnimateDiff)","context_options":["51",0]}},
+  "6":  {"class_type":"CLIPTextEncode","inputs":{"text":"","clip":["4",1]}},
+  "7":  {"class_type":"CLIPTextEncode","inputs":{"text":"","clip":["4",1]}},
+  "5":  {"class_type":"EmptyLatentImage","inputs":{"width":512,"height":512,"batch_size":16}},
+  "3":  {"class_type":"KSampler","inputs":{"seed":0,"steps":20,"cfg":7.5,"sampler_name":"euler","scheduler":"normal","denoise":1.0,"model":["50",0],"positive":["6",0],"negative":["7",0],"latent_image":["5",0]}},
+  "8":  {"class_type":"VAEDecode","inputs":{"samples":["3",0],"vae":["4",2]}},
+  "60": {"class_type":"VHS_VideoCombine","inputs":{"images":["8",0],"frame_rate":8,"loop_count":0,"filename_prefix":"dc_idle","format":"image/gif","pingpong":false,"save_output":true}}
+}

@@ -25,16 +25,23 @@ All figures assume 512px, ComfyUI `--lowvram` (system RAM absorbs overflow), SD1
 | + **IP-Adapter** (hero ref) | +0.5-1GB | yes | ~+3s | medium (identity) | keep the same character |
 | + **ControlNet OpenPose** | +1-1.5GB / CN | yes (one CN, tight) | ~+5-10s | good (pose control) | **sprite frames / poses** |
 | **LayerDiffuse** (transparent) | +~0.4GB, 2x compute | yes | ~15s warm / ~230s cold | n/a | transparent frames |
-| **AnimateDiff** (motion module) | +1.7GB + N frames resident | **risky** | 8 frames ~1-3 min, 16 likely OOM | smooth within a clip | short idle loops |
+| **AnimateDiff** (motion module) | motion+frames resident | **over 4GB (see below)** | slow via paging on 4GB | smooth within a clip | short idle loops |
 | **Character LoRA** (train) | training needs ~6-8GB | **no on 4GB** | n/a locally | best | not practical locally |
 
+**MEASURED peak VRAM (this build, verified on an RTX 2080 with --lowvram):**
+- Pose keyframe (IP-Adapter + ControlNet OpenPose): fits 4GB, ran fine under lowvram.
+- AnimateDiff 16 frames @ 512 = **6.4GB**; 8 frames @ 512 = **5.2GB**; 8 frames @ 384 = **4.7GB**.
+  The checkpoint + motion module + VAE floor is ~4.5GB, so even minimal AnimateDiff
+  exceeds 4GB. It still **runs** on a 4GB card because `--lowvram` pages the overflow
+  into system RAM (Sol has 16GB) -- it just gets slow.
+
 **Verdict for the 4GB rig:**
-- **Recommended core:** IP-Adapter (identity) + ControlNet OpenPose (pose) + fixed
-  seed. This is the sweet spot: same hero, arbitrary poses, generates real sprite
-  frames, comfortably within 4GB.
-- **Optional / caveated:** AnimateDiff for short *ambient* loops (breathing, cape
-  flutter, floating) at low frame counts (<=8). Warn the user it may OOM and fall
-  back to fewer frames.
+- **Recommended core (VERIFIED):** IP-Adapter (identity) + ControlNet OpenPose (pose)
+  + fixed seed. Same hero, arbitrary poses, real sprite frames, within 4GB. Proven
+  end-to-end: one frost knight rendered into two different skeleton poses.
+- **AnimateDiff (works, slow on 4GB):** short *ambient* loops (breathing, cape flutter).
+  Keep frames low and size <= 384 to minimize paging. Produces a looping GIF. On 4GB
+  it completes via RAM paging rather than fitting in VRAM -- set expectations on speed.
 - **Not local on 4GB:** Character-LoRA training. Offer as a "train in the cloud
   (Colab), drop the .safetensors in models/loras" path instead, not an in-app step.
 
