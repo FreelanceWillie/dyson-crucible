@@ -7,21 +7,22 @@ import { state, on, emit, toast, setView } from './state.js';
 
 // ----- plain-language copy for the help overlay + tutorial -------------------
 const HELP_COPY = {
-  resources: 'How hard your computer is working. If a bar turns red, pause the queue and let it cool down.',
+  resources: 'The Engine pill shows if the image engine is ready, warming up, or off. Next to it: how hard your computer is working. If a bar turns red, pause and let it cool down.',
   tree: 'Your styles and categories. Click one to focus everything on it.',
-  main: 'The main stage. Start a hero, get surprised, or find a style here.',
+  main: 'The main stage. Four ways to start: New Hero, Surprise Me, Find a Style, or Animate.',
   chat: 'Talk to the app in plain words. Ask for changes and it adjusts the next batch.',
-  queue: 'Jobs waiting or running. You can pause, cancel, or clear finished ones.',
-  settings: 'Change how art is made and switch the theme. Safe to explore.',
+  queue: 'Jobs waiting or running, with live progress and time left. Pause, cancel, or open Diagnostics here.',
+  settings: 'Quality, theme, feature packs, and updates. Safe to explore.',
   doctor: 'Your setup checklist. Green means ready. It tells you exactly what to fix.',
 };
 
 const TUTORIAL_STEPS = [
+  { sel: '[data-help="resources"]', title: 'Is the engine ready?', body: 'The Engine pill up here tells you what is happening: warming up means give it a minute (first run is slow), ready means it will make images now. You are never left guessing.' },
   { sel: '[data-help="tree"]', title: 'Your styles live here', body: 'On the left are your styles and heroes. Click any of them to focus the whole app on it. Nothing breaks if you poke around.' },
-  { sel: '[data-help="main"]', title: 'Start in the middle', body: 'This is where you begin. New Hero if you know what you want, Surprise Me for ideas, or Find a Style to discover a look.' },
-  { sel: '[data-help="chat"]', title: 'Just ask', body: 'Type what you want in plain words here. Say "make it more metallic" and the next batch listens.' },
-  { sel: '[data-help="queue"]', title: 'Watch it work', body: 'Jobs show up along the bottom. You can pause or cancel any time, so you are always in control.' },
-  { sel: '[data-help="settings"]', title: 'Settings and theme', body: 'The gear opens settings. Change quality, switch to a light theme, or restart this tour whenever you like.' },
+  { sel: '[data-help="main"]', title: 'Start in the middle', body: 'Four ways in: New Hero if you know what you want, Surprise Me for ideas, Find a Style to discover a look, or Animate to make frames and idle loops.' },
+  { sel: '[data-help="chat"]', title: 'Just ask', body: 'Type what you want in plain words here. Say "make it more metallic" and the next batch listens. It also answers how-to questions.' },
+  { sel: '[data-help="queue"]', title: 'Watch it work', body: 'Jobs show up along the bottom with live progress and time left. Pause or cancel any time, or open Diagnostics if something breaks. You are always in control.' },
+  { sel: '[data-help="settings"]', title: 'Settings, packs, updates', body: 'The gear opens settings: change quality, switch theme, unlock feature packs, update the app, or restart this tour whenever you like.' },
 ];
 
 // ============================================================================
@@ -60,7 +61,7 @@ function drawHelp() {
   help.innerHTML = parts.join('');
   help.onclick = closeHelp;
 }
-function niceName(key) { return ({ resources: 'Machine', tree: 'Styles', main: 'Main stage', chat: 'Chat', queue: 'Queue', settings: 'Settings', doctor: 'Setup' })[key] || key; }
+function niceName(key) { return ({ resources: 'Engine & machine', tree: 'Styles', main: 'Main stage', chat: 'Chat', queue: 'Queue', settings: 'Settings', doctor: 'Setup' })[key] || key; }
 
 // ============================================================================
 // COMMAND PALETTE
@@ -74,6 +75,7 @@ const ACTIONS = [
   { name: 'New Hero', hint: 'Start a fresh character', run: newHero },
   { name: 'Surprise Me', hint: 'Explore many takes', run: () => setView('explore') },
   { name: 'Find a Style', hint: 'Rate until a look emerges', run: () => setView('taste') },
+  { name: 'Animate', hint: 'Pose frames or an idle loop', run: () => setView('animate') },
   { name: 'Generate', hint: 'Make a batch for the current hero', run: doGen },
   { name: 'Post-process', hint: 'Clean up and finish', run: () => emit('open', 'postprocess') },
   { name: 'Model Manager', hint: 'Install or pick models', run: () => emit('open', 'models') },
@@ -87,8 +89,12 @@ function newHero() {
   const name = prompt('Name this hero (short id, e.g. frost_knight):');
   if (!name) { return; }
   const desc = prompt('Describe it in plain words:') || '';
-  api.newHero(name.trim(), desc.trim(), '')
-    .then(() => setView('asset', name.trim()))
+  const id = name.trim();
+  api.newHero(id, desc.trim(), '')
+    .then(() => setView('asset', id))
+    // auto-start the first batch so the hero actually produces images
+    .then(() => api.gen(id))
+    .then(() => toast('Making your hero... it appears in a minute or two (watch the Engine pill).', 'good'))
     .catch((e) => toast('Could not create: ' + e.message, 'bad'));
 }
 function doGen() {

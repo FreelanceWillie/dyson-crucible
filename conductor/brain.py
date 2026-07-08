@@ -851,8 +851,15 @@ FAQ = (
     "Animate's pose frames, 'animate' powers idle loops, 'transparent' is native "
     "transparent generation, 'upscale' is AI upscaling. Each has an Unlock button; the "
     "app also auto-installs a pack the first time you use its feature.\n"
-    "- If gens are slow or fail: check the health panel (Doctor). On a 4GB GPU, launch "
-    "ComfyUI with --lowvram and keep size at 512."
+    "- Engine pill (top bar): shows whether the image engine is ready, warming up, "
+    "or off. The first generation after opening the app takes 1 to 2 minutes while the "
+    "engine loads; the pill turns green when it can make images. You can queue a batch "
+    "while it is still warming; it starts automatically.\n"
+    "- Updating: run Update.bat (or 'git pull' then Update.bat). It pulls the latest "
+    "code, re-checks the engine and models, and restarts. Safe to run any time.\n"
+    "- If gens are slow or fail: watch the queue for live progress and time left, and "
+    "open Diagnostics (bottom bar) to copy a full report. Check the health panel "
+    "(Doctor). On a 4GB GPU, launch ComfyUI with --lowvram and keep size at 512."
 )
 
 
