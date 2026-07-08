@@ -30,16 +30,22 @@ You describe, rate, and pick. It runs entirely on your own Windows PC, no accoun
 
 ## Quick start
 
+**The easy way (no commands):**
+1. Get the code: on the GitHub page click **Code → Download ZIP**, then unzip it (or `git clone https://github.com/FreelanceWillie/dyson-crucible`).
+2. **Double-click `Dyson Crucible.bat`.**
+
+That one file installs everything the first time (Python, Ollama + model, ComfyUI + models, config) and, every time after, just starts the app and opens it in your browser. It is safe to close and double-click again if a download stops. Then drop 8 to 20 of your style images into `references/default/`.
+
+<details><summary>Prefer the command line?</summary>
+
 ```powershell
 git clone https://github.com/FreelanceWillie/dyson-crucible
 cd dyson-crucible
-.\bootstrap.ps1            # installs Python deps, Ollama + model, ComfyUI + node, model files, config
+.\bootstrap.ps1                       # or:  .\bootstrap.ps1 -ComfyUIRoot "D:\AI\ComfyUI"
+python conductor/server.py            # then open http://127.0.0.1:7860
 ```
-Then drop 8 to 20 style images into `references/default/`, start ComfyUI + `ollama serve` (the Doctor has Start buttons), and run:
-```powershell
-python conductor/server.py     # open http://127.0.0.1:7860
-```
-`bootstrap.ps1` is idempotent and prints clear progress; anything it cannot auto-install, it links. Details and a manual-install path: [docs/SETUP.md](docs/SETUP.md).
+`bootstrap.ps1` is idempotent and prints clear progress; anything it cannot auto-install, it links. To update later: **`.\update.ps1`** (or the Update button in Settings). Details + manual path: [docs/SETUP.md](docs/SETUP.md).
+</details>
 
 ---
 
