@@ -163,7 +163,7 @@ def ensure_up(cfg: Dict[str, Any]) -> bool:
     # for the port and both would crash (the 'window flashes' symptom). Just wait.
     global _LAST_LAUNCH
     if _LAST_LAUNCH and (time.time() - _LAST_LAUNCH) < 150:
-        deadline = time.time() + 120
+        deadline = time.time() + 160
         while time.time() < deadline:
             if is_up(url):
                 return True
@@ -216,7 +216,7 @@ def ensure_up(cfg: Dict[str, Any]) -> bool:
         return False
 
     # ComfyUI on a 4GB card can take a while to import + load; poll up to ~120s.
-    deadline = time.time() + 120
+    deadline = time.time() + 160
     while time.time() < deadline:
         if is_up(url):
             print("[comfyui] ComfyUI is up.")

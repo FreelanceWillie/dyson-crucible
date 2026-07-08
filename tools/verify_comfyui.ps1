@@ -85,22 +85,26 @@ function Test-ComfyLaunch($launcher) {
         try { $proc = Start-Process -FilePath $launcher -PassThru -WindowStyle Minimized } catch { return $false }
     }
     $ok = $false
-    $spin = @('|', '/', '-', '\'); $t0 = Get-Date
-    for ($i = 0; $i -lt 120; $i++) {   # up to ~4 min, plenty for a weak 4GB laptop
+    # WALL-CLOCK cap of 150s: a healthy ComfyUI answers /system_stats within ~1-2 min
+    # (server + node registration; the model loads later, on first gen). Past 150s it
+    # is hung/failed, not slow -- so we stop instead of the old ~10-minute drag.
+    $spin = @('|', '/', '-', '\'); $t0 = Get-Date; $i = 0; $capSecs = 150
+    while (((Get-Date) - $t0).TotalSeconds -lt $capSecs) {
         try {
-            $r = Invoke-WebRequest "http://127.0.0.1:8188/system_stats" -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+            $r = Invoke-WebRequest "http://127.0.0.1:8188/system_stats" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
             if ($r.StatusCode -eq 200) { $ok = $true; break }
         } catch {}
-        # live status line: spinner + elapsed + the last thing ComfyUI printed
+        # live status line: spinner + elapsed (of cap) + the last thing ComfyUI printed
         $secs = [int]((Get-Date) - $t0).TotalSeconds
         $last = ""
         try {
             $newest = @($logOut, $logErr) | Where-Object { Test-Path $_ } | Sort-Object { (Get-Item $_).LastWriteTime } -Descending | Select-Object -First 1
             if ($newest) { $last = (Get-Content $newest -Tail 1 -ErrorAction SilentlyContinue) }
         } catch {}
-        if ($last.Length -gt 70) { $last = $last.Substring(0, 70) }
-        Write-Host ("`r      $($spin[$i % 4]) waiting for ComfyUI  ${secs}s   $last".PadRight(110)) -NoNewline
+        if ($last.Length -gt 66) { $last = $last.Substring(0, 66) }
+        Write-Host ("`r      $($spin[$i % 4]) waiting for ComfyUI  ${secs}s/${capSecs}s   $last".PadRight(110)) -NoNewline
         Start-Sleep -Seconds 2
+        $i++
     }
     Write-Host ""   # end the status line
     if (-not $ok) {
