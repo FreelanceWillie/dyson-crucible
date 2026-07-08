@@ -23,7 +23,9 @@ def live_report():
 
 def tail(path, n=30):
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        # utf-8-sig strips a BOM if present (config.yaml / logs can have one, which
+        # crashed the cp1252 console on Windows).
+        with open(path, "r", encoding="utf-8-sig", errors="replace") as fh:
             return "".join(fh.readlines()[-n:])
     except Exception:
         return "(not found)"
@@ -61,13 +63,25 @@ def static_report():
     return "\n".join(L)
 
 
+def _emit(text):
+    # Never crash on the Windows cp1252 console: force UTF-8, replace what won't map.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+    try:
+        print(text)
+    except Exception:
+        sys.stdout.buffer.write((text + "\n").encode("utf-8", "replace"))
+
+
 def main():
     report = live_report()
     if report:
-        print("(live report from the running app)\n")
-        print(report)
+        _emit("(live report from the running app)\n")
+        _emit(report)
     else:
-        print(static_report())
+        _emit(static_report())
 
 
 if __name__ == "__main__":
