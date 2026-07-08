@@ -92,6 +92,35 @@ def _run_update():
     }
 
 
+_ENGINE_CACHE = {"t": 0.0, "data": None}
+
+
+def _engine_status(conf):
+    """ComfyUI state for the in-app pill: 'ready' (answering), 'warming' (a process
+    is on the port or we launched recently but it isn't answering yet), or 'off'.
+    Cached ~3s so the poll doesn't hammer the probe."""
+    import time as _t
+    now = _t.time()
+    if _ENGINE_CACHE["data"] is not None and (now - _ENGINE_CACHE["t"]) < 3:
+        return _ENGINE_CACHE["data"]
+    state = "off"
+    try:
+        import comfyui as _cf
+        url = (conf.get("comfyui") or {}).get("url", "http://127.0.0.1:8188")
+        if _cf.is_up(url):
+            state = "ready"
+        else:
+            recent = _cf._LAST_LAUNCH and (now - _cf._LAST_LAUNCH) < 160
+            if recent or _cf._pids_on_port(_cf._port_from_url(url)):
+                state = "warming"
+    except Exception:
+        pass
+    data = {"state": state}
+    _ENGINE_CACHE["t"] = now
+    _ENGINE_CACHE["data"] = data
+    return data
+
+
 # Background feature-group installs: {group_id: {"log": [str], "done": bool, "ok": bool}}
 _CAP_PROGRESS = {}
 _CAP_LOCK = threading.Lock()
@@ -397,6 +426,7 @@ class Handler(BaseHTTPRequestHandler):
             # never black-box his only machine: live CPU/RAM/GPU/VRAM + queue state
             snap = resmod.snapshot()
             snap["queue_paused"] = jobs.is_paused()
+            snap["engine"] = _engine_status(conf)
             self._send_json(snap)
             return
 

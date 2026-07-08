@@ -13,6 +13,15 @@ function renderRes() {
   if (!bar) { return; }
   if (!r) { bar.innerHTML = '<span class="faint">reading machine...</span>'; return; }
   const parts = [];
+  // Engine (ComfyUI) status pill so he knows when he can actually generate.
+  const eng = (r.engine && r.engine.state) || 'off';
+  const engMap = {
+    ready: ['&#9679; Engine ready', 'var(--good)'],
+    warming: ['&#9673; Engine warming up...', 'var(--accent,#6cf)'],
+    off: ['&#9675; Engine off', 'var(--faint,#888)'],
+  };
+  const [engTxt, engCol] = engMap[eng] || engMap.off;
+  parts.push(`<span class="chip" title="ComfyUI, the image engine" style="color:${engCol};border-color:${engCol}">${engTxt}</span>`);
   if (r.cpu_pct != null) { parts.push(meter('CPU', r.cpu_pct)); }
   if (r.ram) { parts.push(meter('RAM', r.ram.pct, `${(r.ram.used_mb / 1024).toFixed(1)}/${(r.ram.total_mb / 1024).toFixed(1)}GB`)); }
   if (r.gpu) { parts.push(meter('GPU', r.gpu.util_pct, r.gpu.name));

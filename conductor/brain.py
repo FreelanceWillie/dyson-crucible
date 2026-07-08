@@ -289,10 +289,37 @@ def _parse_patch(text: str) -> Dict[str, Any]:
 # Backend callers. Each returns the RAW model text (or "" on failure). Parsing
 # is the caller's job so all three share one code path afterwards.
 # ---------------------------------------------------------------------------
+def _ensure_ollama(url: str) -> None:
+    """Self-heal the brain: if the Ollama daemon isn't answering, try to start it
+    ('ollama serve') and wait briefly. Best-effort, never raises -- parallels the
+    ComfyUI self-heal so a stopped brain doesn't just error."""
+    requests = _requests()
+    try:
+        requests.get(url + "/api/tags", timeout=2); return  # already up
+    except Exception:
+        pass
+    try:
+        import shutil, subprocess, time as _t
+        if not shutil.which("ollama"):
+            return
+        flags = 0x00000008 if os.name == "nt" else 0  # DETACHED_PROCESS
+        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, creationflags=flags)
+        for _ in range(15):  # ~15s for the daemon to bind
+            _t.sleep(1)
+            try:
+                requests.get(url + "/api/tags", timeout=2); return
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+
 def _call_local(messages: List[Dict[str, str]], cfg: Dict[str, Any]) -> str:
     """Call a local Ollama server's /api/chat endpoint (stream off)."""
     requests = _requests()
     url = str(_cfg_get(cfg, "ollama_url", "http://localhost:11434")).rstrip("/")
+    _ensure_ollama(url)  # start the brain if it is not running
     model = str(_cfg_get(cfg, "ollama_model", "qwen2.5:3b-instruct"))
     # keep_alive=0 unloads the model from VRAM right after the reply, so the brain
     # does not hold GPU memory that the image generator (ComfyUI) needs. On a 4GB
