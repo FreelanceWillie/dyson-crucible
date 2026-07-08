@@ -520,6 +520,42 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(_run_update())
             return
 
+        if path == "/api/animate/export":
+            import animate as animmod
+            urls = data.get("frames") or []
+            fmt = (data.get("format") or "gif").strip()
+            # map servable urls -> disk paths
+            frames = []
+            for u in urls:
+                fp = u
+                for pref, key in (("/outputs/", "outputs"), ("/references/", "references"),
+                                  ("/vectors/", "vectors")):
+                    if isinstance(u, str) and u.startswith(pref):
+                        fp = os.path.join(paths.get(key, key), u[len(pref):].replace("/", os.sep)); break
+                if os.path.isfile(fp):
+                    frames.append(fp)
+            if not frames:
+                self._send_json({"error": "no valid frames"}, 400); return
+            exp_dir = os.path.join(paths.get("outputs", "outputs"), "animation", "export")
+            try:
+                tw = int(data.get("tween") or 0)
+                if tw > 0:
+                    frames = animmod.tween(frames, tw, os.path.join(exp_dir, "_tween"),
+                                           loop=bool(data.get("loop", True)))
+                if fmt == "sheet":
+                    out = animmod.export_sheet(frames, os.path.join(exp_dir, "spritesheet.png"),
+                                               columns=int(data.get("columns") or 0))
+                elif fmt == "zip":
+                    out = animmod.export_zip(frames, os.path.join(exp_dir, "frames.zip"))
+                else:
+                    out = animmod.export_gif(frames, os.path.join(exp_dir, "animation.gif"),
+                                             fps=int(data.get("fps") or 8),
+                                             loop=bool(data.get("loop", True)))
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500); return
+            self._send_json({"ok": True, "url": self._fs_to_url(paths, out)})
+            return
+
         if path == "/api/animate":
             mode = (data.get("mode") or "keyframes").strip()
             asset = (data.get("asset") or "animation").strip()

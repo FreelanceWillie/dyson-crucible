@@ -75,14 +75,20 @@ comes from the hero ref, not re-described each frame.
 
 ## Build phases
 
-- **P1 (core):** install ControlNet + an SD1.5 OpenPose model; a keyframe workflow
-  (IP-Adapter hero + OpenPose + seed lock); verify "same hero, two different poses."
-- **P2 (tween):** RIFE/FILM interpolation node between keyframes; GIF/sheet export.
-- **P3 (editor UI):** timeline of keyframes, per-keyframe prompt + pose, live
-  preview, export controls; wire transparent (LayerDiffuse) as a per-export toggle.
-- **P-opt:** AnimateDiff idle-loop mode (low frame count, OOM-guarded); cloud-LoRA
-  import path.
+- **P1 (core) - DONE:** ControlNet + SD1.5 OpenPose model; keyframe workflow
+  (IP-Adapter hero + OpenPose + seed lock). Verified "same hero, two poses".
+- **P2 (tween + export) - DONE:** crossfade in-between frames (`animate.tween`),
+  plus sprite-sheet / animated-GIF / frame-zip export (`animate.export_*`). RIFE
+  interpolation is the future upgrade for clean pose in-betweens (crossfade ghosts
+  on big pose jumps -- stated in the UI).
+- **P3 (editor UI) - DONE:** timeline filmstrip with per-frame select/delete,
+  real-time playback (play/pause, speed), onion skin, and export controls (GIF /
+  sprite sheet / frames, with optional smoothing). See `app/js/animate.js`.
+- **AnimateDiff idle-loop - DONE** (measured budgets above).
+- **P-opt (future):** RIFE/FILM interpolation pack for true pose tweening;
+  cloud-trained character LoRA import.
 
-Each phase is installed + verified live before the next, same as the LayerDiffuse
-work (see `tools/patch_layerdiffuse.py` for the pattern of vendoring + patching a
-custom node).
+Everything above is installed + verified live, same as the LayerDiffuse work (see
+`tools/patch_layerdiffuse.py` for the vendor + patch pattern). Optional deps install
+on demand as feature packs (`capabilities.py`); an old install updates in place with
+`update.ps1` or the Settings > Updates button.

@@ -85,6 +85,7 @@ export const api = {
   poses: () => GET('/api/poses'),
   animate: (payload) => POST('/api/animate', payload),
   animateResult: (job) => GET('/api/animate/result?' + qs({ job })),
+  animateExport: (payload) => POST('/api/animate/export', payload),
   // categories
   catNew: (path, parent, settings) => POST('/api/category/new', { path, parent, settings }),
   catUpdate: (path, settings) => POST('/api/category/update', { path, settings }),

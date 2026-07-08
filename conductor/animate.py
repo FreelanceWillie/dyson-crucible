@@ -180,6 +180,89 @@ def idle(prompt: str, cfg: Dict[str, Any], out_dir: str, frames: int = 16,
     return {"gif": gif_dst if os.path.isfile(gif_dst) else None, "frames": frame_paths}
 
 
+# --- export + tween (local, PIL) -------------------------------------------
+
+def _open_frames(paths: List[str]):
+    from PIL import Image
+    ims = []
+    for p in paths:
+        if p and os.path.isfile(p):
+            ims.append(Image.open(p).convert("RGBA"))
+    return ims
+
+
+def tween(paths: List[str], count: int, out_dir: str, loop: bool = False) -> List[str]:
+    """Insert `count` crossfaded in-between frames between each pair. Cheap and
+    local. Works well for small motion; big pose jumps will ghost (that is a
+    fundamental limit of blending -- for clean pose interpolation use RIFE)."""
+    from PIL import Image
+    ims = _open_frames(paths)
+    if len(ims) < 2 or count < 1:
+        return paths
+    os.makedirs(out_dir, exist_ok=True)
+    seq = list(ims) + ([ims[0]] if loop else [])
+    out_ims = []
+    for a, b in zip(seq, seq[1:]):
+        out_ims.append(a)
+        for k in range(1, count + 1):
+            out_ims.append(Image.blend(a, b, k / (count + 1)))
+    if not loop:
+        out_ims.append(seq[-1])
+    paths_out = []
+    for i, im in enumerate(out_ims):
+        d = os.path.join(out_dir, "tween_%03d.png" % i)
+        im.save(d); paths_out.append(d)
+    return paths_out
+
+
+def export_sheet(paths: List[str], out_path: str, columns: int = 0) -> str:
+    """Pack frames into a single sprite-sheet PNG (transparent gaps preserved)."""
+    from PIL import Image
+    ims = _open_frames(paths)
+    if not ims:
+        raise RuntimeError("no frames to export")
+    w = max(i.width for i in ims); h = max(i.height for i in ims)
+    n = len(ims)
+    cols = columns if columns and columns > 0 else min(n, 8)
+    rows = (n + cols - 1) // cols
+    sheet = Image.new("RGBA", (cols * w, rows * h), (0, 0, 0, 0))
+    for idx, im in enumerate(ims):
+        r, c = divmod(idx, cols)
+        sheet.paste(im, (c * w + (w - im.width) // 2, r * h + (h - im.height) // 2))
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    sheet.save(out_path)
+    return out_path
+
+
+def export_gif(paths: List[str], out_path: str, fps: int = 8, loop: bool = True) -> str:
+    """Write an animated GIF from the frames."""
+    from PIL import Image
+    ims = _open_frames(paths)
+    if not ims:
+        raise RuntimeError("no frames to export")
+    # flatten onto white for GIF (no alpha); keep it simple + universally viewable
+    flat = []
+    for im in ims:
+        bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
+        flat.append(Image.alpha_composite(bg, im).convert("P", palette=Image.ADAPTIVE))
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    dur = int(1000 / max(1, fps))
+    flat[0].save(out_path, save_all=True, append_images=flat[1:], duration=dur,
+                 loop=0 if loop else 1, disposal=2)
+    return out_path
+
+
+def export_zip(paths: List[str], out_path: str) -> str:
+    """Zip the individual frame PNGs."""
+    import zipfile
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
+        for i, p in enumerate(paths):
+            if p and os.path.isfile(p):
+                z.write(p, "frame_%03d.png" % i)
+    return out_path
+
+
 def _comfy_output_dir(cfg: Dict[str, Any]) -> Optional[str]:
     root = (cfg.get("comfyui") or {}).get("root") or ""
     for c in ([os.path.join(root, "output"), os.path.join(root, "ComfyUI", "output")] if root else []) + \
