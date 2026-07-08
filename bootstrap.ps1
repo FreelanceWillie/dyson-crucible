@@ -308,31 +308,38 @@ if (Test-Path $ipNodeDir) {
 # =====================================================================
 Step 4 "Installing ComfyUI-layerdiffuse (optional: true transparent-background gen)..."
 $ldNodeDir = Join-Path $NodesDir "ComfyUI-layerdiffuse"
-if (Test-Path $ldNodeDir) {
-    Ok "ComfyUI-layerdiffuse already present; re-applying compatibility patch."
-} elseif (-not (Test-Path $NodesDir)) {
+if (-not (Test-Path $NodesDir)) {
     Warn "custom_nodes folder not found; skipping LayerDiffuse (optional)."
     Manual "Later:  git clone $LayerDiffuseGitUrl `"$ldNodeDir`"  then  python tools/patch_layerdiffuse.py `"$ldNodeDir`""
-} elseif (Have-Cmd "git") {
+} elseif ((-not (Test-Path $ldNodeDir)) -and (-not (Have-Cmd "git"))) {
+    Warn "git not installed; skipping LayerDiffuse (optional)."
+} else {
+    # Runs whether the node was just cloned OR is already present: deps + patch
+    # must re-run every time (a pre-existing clone still needs cv2 installed and
+    # the compatibility patch applied, so re-running is what heals it).
     try {
         if (-not (Test-Path $ldNodeDir)) {
             Info "Cloning ComfyUI-layerdiffuse into custom_nodes..."
             git clone $LayerDiffuseGitUrl $ldNodeDir
+        } else {
+            Ok "ComfyUI-layerdiffuse already present; re-checking deps + patch."
         }
-        # Install the node's Python deps into ComfyUI's embedded python (portable).
+        # Install the node's Python deps (opencv/cv2 etc.) into the SAME python
+        # that runs ComfyUI: portable ships python_embeded; a git-clone source
+        # build uses the repo .venv. Installing only into python_embeded left
+        # source builds without cv2 -> the node failed to import.
         $embPy = Join-Path $ComfyUIRoot "python_embeded/python.exe"
+        $repoVenvPy = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+        $ldPy = if (Test-Path $embPy) { $embPy } elseif (Test-Path $repoVenvPy) { $repoVenvPy } else { $null }
         $ldReqs = Join-Path $ldNodeDir "requirements.txt"
-        if ((Test-Path $embPy) -and (Test-Path $ldReqs)) {
+        if ($ldPy -and (Test-Path $ldReqs)) {
             Info "Installing LayerDiffuse deps into ComfyUI's python..."
-            & $embPy -m pip install -r $ldReqs 2>&1 | Out-Null
+            & $ldPy -m pip install -r $ldReqs 2>&1 | Out-Null
         }
         # Apply our compatibility patch (the upstream node breaks on current ComfyUI).
-        # Idempotent: safe to re-run. Uses whatever python is on PATH (pure file edits).
+        # Idempotent: safe to re-run. Avoid bare 'python' (MS Store stub).
         $patchPy = Join-Path $RepoRoot "tools/patch_layerdiffuse.py"
         if (Test-Path $patchPy) {
-            # Prefer the repo .venv python, then ComfyUI's embedded python. Avoid
-            # bare 'python' (Microsoft Store stub on many machines).
-            $repoVenvPy = Join-Path $RepoRoot ".venv\Scripts\python.exe"
             $pyExe = if (Test-Path $repoVenvPy) { $repoVenvPy } elseif (Test-Path $embPy) { $embPy } else { $null }
             if ($pyExe) {
                 & $pyExe $patchPy $ldNodeDir
@@ -346,8 +353,6 @@ if (Test-Path $ldNodeDir) {
         Warn "LayerDiffuse install/patch hit a problem (optional; 'cut' mode still works)."
         Manual "Manual:  git clone $LayerDiffuseGitUrl `"$ldNodeDir`"  then  python tools/patch_layerdiffuse.py `"$ldNodeDir`""
     }
-} else {
-    Warn "git not installed; skipping LayerDiffuse (optional)."
 }
 
 # =====================================================================
