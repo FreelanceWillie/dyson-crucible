@@ -49,6 +49,35 @@ def static_report():
     # venv python check
     venv_py = os.path.join(ROOT, ".venv", "Scripts", "python.exe")
     L.append("\n.venv python: %s" % ("present" if os.path.isfile(venv_py) else "MISSING"))
+    # ComfyUI build type (portable = self-contained + reliable; source = fragile).
+    L.append("\n--- ComfyUI install ---")
+    found = False
+    for base in (os.path.join(os.path.dirname(ROOT), "ComfyUI"), "E:/Tools/ComfyUI", "E:/ComfyUI"):
+        if os.path.isdir(base):
+            has_emb = os.path.isfile(os.path.join(base, "python_embeded", "python.exe"))
+            has_bat = os.path.isfile(os.path.join(base, "run_nvidia_gpu.bat"))
+            main1 = os.path.isfile(os.path.join(base, "ComfyUI", "main.py"))
+            main2 = os.path.isfile(os.path.join(base, "main.py"))
+            if has_emb or has_bat or main1 or main2:
+                found = True
+                kind = "PORTABLE (self-contained)" if (has_emb or has_bat) else "SOURCE build (fragile)"
+                L.append("root: %s" % base)
+                L.append("type: %s" % kind)
+                L.append("python_embeded: %s | run_nvidia_gpu.bat: %s | main.py: %s"
+                         % (has_emb, has_bat, main1 or main2))
+                # list custom nodes (a hanging one can block startup)
+                cn = os.path.join(base, "ComfyUI", "custom_nodes")
+                if not os.path.isdir(cn):
+                    cn = os.path.join(base, "custom_nodes")
+                if os.path.isdir(cn):
+                    try:
+                        nodes = [d for d in os.listdir(cn) if os.path.isdir(os.path.join(cn, d)) and not d.startswith("__")]
+                        L.append("custom_nodes: " + (", ".join(nodes) or "(none)"))
+                    except Exception:
+                        pass
+                break
+    if not found:
+        L.append("ComfyUI NOT found (not installed).")
     # marker
     L.append(".dc_installed marker: %s" % ("yes" if os.path.isfile(os.path.join(ROOT, ".dc_installed")) else "no"))
     # comfyui logs: the app's launch log AND the installer's verify test-launch logs
