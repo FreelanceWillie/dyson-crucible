@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "conductor",
+      "runtimeExecutable": "E:/ComfyUI/venv/Scripts/python.exe",
+      "runtimeArgs": ["conductor/server.py"],
+      "port": 7860
+    }
+  ]
+}

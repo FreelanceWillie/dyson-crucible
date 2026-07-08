@@ -133,6 +133,10 @@ async function renderSettings() {
         <label class="row" style="gap:8px"><input type="checkbox" id="prefNotify" ${prefs.notifyDone ? 'checked' : ''}> <span>Notify when a batch is done</span></label>
       </div>
 
+      <div class="h">Feature packs</div>
+      <div class="faint">Optional extras. Download only what you want, when you want it.</div>
+      <div class="col" id="featurePacks" style="gap:10px"><div class="faint">Checking...</div></div>
+
       <div class="h">Help</div>
       <div class="row"><button class="btn sm" id="setTutorial">Restart tutorial</button></div>
     </div>`;
@@ -156,6 +160,69 @@ async function renderSettings() {
   notify.onchange = () => { const p = loadPrefs(); p.notifyDone = notify.checked; savePrefs(p); };
 
   box.querySelector('#setTutorial').onclick = () => { close(); emit('open', 'tutorial'); };
+
+  renderFeaturePacks(box);
+}
+
+// ----- feature packs (optional capability groups) ----------------------------
+let _packPoll = null;
+async function renderFeaturePacks(box) {
+  const host = box.querySelector('#featurePacks');
+  if (!host) { return; }
+  let data;
+  try { data = await api.capabilities(); }
+  catch (e) { host.innerHTML = `<div class="faint">Could not check feature packs (${e.message}).</div>`; return; }
+  const groups = data.groups || {};
+  const prog = data.progress || {};
+  host.innerHTML = Object.keys(groups).map((gid) => {
+    const g = groups[gid];
+    const p = prog[gid];
+    let right;
+    if (g.installed) {
+      right = `<span class="chip" style="color:var(--good);border-color:var(--good)">&#10003; Installed</span>`;
+    } else if (p && !p.done) {
+      const last = (p.log && p.log.length) ? p.log[p.log.length - 1] : 'Installing...';
+      right = `<span class="faint" data-prog="${gid}">${last.replace(/</g, '&lt;')}</span>`;
+    } else {
+      right = `<button class="btn sm" data-unlock="${gid}">Unlock</button>`;
+    }
+    return `<div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px">
+      <div class="col" style="gap:2px"><b>${g.title}</b><span class="faint" style="font-size:12px">${g.why}</span></div>
+      <div>${right}</div></div>`;
+  }).join('');
+
+  host.querySelectorAll('[data-unlock]').forEach((b) => {
+    b.onclick = async () => {
+      const gid = b.getAttribute('data-unlock');
+      b.disabled = true; b.textContent = 'Starting...';
+      try { await api.installCapability(gid); toast('Downloading ' + gid + '...', 'good'); }
+      catch (e) { toast('Unlock failed: ' + e.message, 'bad'); b.disabled = false; b.textContent = 'Unlock'; return; }
+      pollPacks(box);
+    };
+  });
+
+  // if anything is mid-install, keep polling
+  const busy = Object.keys(prog).some((k) => prog[k] && !prog[k].done);
+  if (busy) { pollPacks(box); }
+}
+
+function pollPacks(box) {
+  if (_packPoll) { return; }
+  _packPoll = setInterval(async () => {
+    const live = document.getElementById('featurePacks');
+    if (!live || !box.classList.contains('on')) { clearInterval(_packPoll); _packPoll = null; return; }
+    let data;
+    try { data = await api.capabilities(); } catch (_) { return; }
+    const prog = data.progress || {};
+    const busy = Object.keys(prog).some((k) => prog[k] && !prog[k].done);
+    // update inline progress text
+    Object.keys(prog).forEach((gid) => {
+      const el = live.querySelector(`[data-prog="${gid}"]`);
+      const p = prog[gid];
+      if (el && p && p.log && p.log.length) { el.textContent = p.log[p.log.length - 1]; }
+    });
+    if (!busy) { clearInterval(_packPoll); _packPoll = null; renderFeaturePacks(box); }
+  }, 1500);
 }
 
 function openSettings() {

@@ -30,7 +30,7 @@ from urllib.parse import urlparse, parse_qs
 try:
     from conductor import (cfg, brief as briefmod, brain, jobs, categories as catmod,
                            resources as resmod, models as modelsmod, webref as webrefmod,
-                           postprocess as ppmod, taste as tastemod)
+                           postprocess as ppmod, taste as tastemod, capabilities as capmod)
 except Exception:  # pragma: no cover - fallback for loose-script execution
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import cfg  # type: ignore
@@ -43,6 +43,28 @@ except Exception:  # pragma: no cover - fallback for loose-script execution
     import webref as webrefmod  # type: ignore
     import postprocess as ppmod  # type: ignore
     import taste as tastemod  # type: ignore
+    import capabilities as capmod  # type: ignore
+
+
+# Background feature-group installs: {group_id: {"log": [str], "done": bool, "ok": bool}}
+_CAP_PROGRESS = {}
+_CAP_LOCK = threading.Lock()
+
+
+def _cap_install_bg(group_id, conf):
+    def log(msg):
+        with _CAP_LOCK:
+            _CAP_PROGRESS.setdefault(group_id, {"log": [], "done": False, "ok": False})["log"].append(msg)
+    with _CAP_LOCK:
+        _CAP_PROGRESS[group_id] = {"log": [], "done": False, "ok": False}
+    ok = False
+    try:
+        ok = capmod.install(group_id, conf, log)
+    except Exception as exc:  # noqa: BLE001
+        log("install crashed: " + str(exc))
+    with _CAP_LOCK:
+        _CAP_PROGRESS[group_id]["done"] = True
+        _CAP_PROGRESS[group_id]["ok"] = ok
 
 
 REPO_ROOT = cfg.REPO_ROOT
@@ -340,6 +362,16 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"checks": self._doctor(conf, paths)})
             return
 
+        if path == "/api/capabilities":
+            try:
+                st = capmod.status(conf)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500); return
+            with _CAP_LOCK:
+                prog = {k: dict(v) for k, v in _CAP_PROGRESS.items()}
+            self._send_json({"groups": st, "progress": prog})
+            return
+
         if path == "/api/models/search":
             q = (query.get("q") or [""])[0]
             kind = (query.get("kind") or ["lora"])[0]
@@ -406,6 +438,18 @@ class Handler(BaseHTTPRequestHandler):
     def _handle_post_api(self, path, data):
         conf = _cfg()
         paths = _paths(conf)
+
+        if path == "/api/capabilities/install":
+            group = (data.get("group") or "").strip()
+            if group not in capmod.GROUPS:
+                self._send_json({"error": "unknown group: " + group}, 400); return
+            with _CAP_LOCK:
+                running = group in _CAP_PROGRESS and not _CAP_PROGRESS[group].get("done", True)
+            if running:
+                self._send_json({"ok": True, "already": True}); return
+            threading.Thread(target=_cap_install_bg, args=(group, conf), daemon=True).start()
+            self._send_json({"ok": True, "started": group})
+            return
 
         if path == "/api/new":
             name = (data.get("name") or "").strip()

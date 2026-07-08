@@ -76,6 +76,9 @@ export const api = {
   freeVram: () => POST('/api/vram/free'),
   startComfyui: () => POST('/api/setup/start-comfyui'),
   startOllama: () => POST('/api/setup/start-ollama'),
+  // optional feature-group installers (unlock on demand)
+  capabilities: () => GET('/api/capabilities'),
+  installCapability: (group) => POST('/api/capabilities/install', { group }),
   // categories
   catNew: (path, parent, settings) => POST('/api/category/new', { path, parent, settings }),
   catUpdate: (path, settings) => POST('/api/category/update', { path, settings }),
