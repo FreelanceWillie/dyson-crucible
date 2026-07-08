@@ -294,7 +294,11 @@ def _call_local(messages: List[Dict[str, str]], cfg: Dict[str, Any]) -> str:
     requests = _requests()
     url = str(_cfg_get(cfg, "ollama_url", "http://localhost:11434")).rstrip("/")
     model = str(_cfg_get(cfg, "ollama_model", "qwen2.5:7b-instruct"))
-    payload = {"model": model, "messages": messages, "stream": False}
+    # keep_alive=0 unloads the model from VRAM right after the reply, so the brain
+    # does not hold GPU memory that the image generator (ComfyUI) needs. On a 4GB
+    # card the brain and the gen would otherwise fight over VRAM. They run
+    # sequentially (chat, then gen), so a brief reload per reply is a fine trade.
+    payload = {"model": model, "messages": messages, "stream": False, "keep_alive": 0}
     resp = requests.post(url + "/api/chat", json=payload, timeout=120)
     resp.raise_for_status()
     data = resp.json()
