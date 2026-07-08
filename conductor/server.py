@@ -1565,9 +1565,47 @@ class Handler(BaseHTTPRequestHandler):
 
     def _jobs_list(self):
         try:
-            return jobs.list_jobs() or []
+            js = jobs.list_jobs() or []
         except Exception:
             return []
+        return self._decorate_progress(js)
+
+    @staticmethod
+    def _parse_iso(s):
+        if not s:
+            return None
+        try:
+            from datetime import datetime
+            return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+    def _decorate_progress(self, js):
+        """Add elapsed/pct/eta to running jobs, estimated from a rolling average of
+        recent finished jobs of the same kind. No ComfyUI internals needed -- a
+        time-based estimate is enough for a filling ring + countdown."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        # average duration (seconds) of the last few DONE jobs, per kind
+        durs = {}
+        for j in js:
+            if j.get("status") == "done":
+                c = self._parse_iso(j.get("created")); u = self._parse_iso(j.get("updated"))
+                if c and u and u > c:
+                    durs.setdefault(j.get("kind"), []).append((u - c).total_seconds())
+        avg = {k: (sum(v[-6:]) / len(v[-6:])) for k, v in durs.items() if v}
+        for j in js:
+            if j.get("status") == "running":
+                c = self._parse_iso(j.get("created"))
+                if not c:
+                    continue
+                elapsed = max(0.0, (now - c).total_seconds())
+                j["elapsed"] = round(elapsed)
+                a = avg.get(j.get("kind"))
+                if a and a > 0:
+                    j["pct"] = max(0.02, min(0.98, elapsed / a))
+                    j["eta"] = max(0, round(a - elapsed))
+        return js
 
     def _build_state(self, conf, paths):
         assets = []

@@ -30,18 +30,19 @@ function renderQueue() {
   const q = state.queue || []; const strip = document.getElementById('queuestrip');
   if (!strip) { return; }
   const active = q.filter((j) => j.status === 'queued' || j.status === 'running');
-  const now = Date.now() / 1000;
   const chips = q.slice(-8).map((j) => {
-    const sp = j.status === 'running' ? '<span class="spinner" style="display:inline-block;vertical-align:middle"></span> ' : '';
     const cancel = (j.status === 'queued' || j.status === 'running') ? ` <a href="#" data-cancel="${j.id}">cancel</a>` : '';
     const tries = j.tries ? ` (retry ${j.tries})` : '';
-    // elapsed on a running job = "is it doing anything?"
-    let elapsed = '';
-    if (j.status === 'running' && j.created) { const s = Math.max(0, Math.round(now - j.created)); elapsed = ` <span class="faint">${s}s</span>`; }
+    let lead = '', tail = '';
+    if (j.status === 'running') {
+      lead = (typeof j.pct === 'number' ? ring(j.pct) : '<span class="spinner" style="display:inline-block;vertical-align:middle"></span>') + ' ';
+      if (typeof j.eta === 'number') { tail = ` <span class="faint">~${fmtSecs(j.eta)} left</span>`; }
+      else if (typeof j.elapsed === 'number') { tail = ` <span class="faint">${fmtSecs(j.elapsed)}</span>`; }
+    }
     // failed job -> a "why?" link that reveals the captured error
     let why = '';
     if (j.status === 'failed' && j.error) { why = ` <a href="#" data-why="${j.id}" style="color:var(--bad)">why?</a>`; }
-    return `<span class="pill ${j.status}" ${j.error ? `title="${esc(j.error).slice(0, 300)}"` : ''}>${sp}${esc(j.kind)}:${esc(j.asset)} ${esc(j.status)}${tries}${elapsed}${cancel}${why}</span>`;
+    return `<span class="pill ${j.status}" ${j.error ? `title="${esc(j.error).slice(0, 300)}"` : ''}>${lead}${esc(j.kind)}:${esc(j.asset)} ${esc(j.status)}${tries}${tail}${cancel}${why}</span>`;
   }).join(' ');
   strip.innerHTML = `<b>Queue</b> <span class="chip">${active.length} active</span> ${chips || '<span class="faint">idle</span>'} <button class="btn sm ghost" id="qdiag">Diagnostics</button> <button class="btn sm ghost" id="qclear">Clear finished</button>`;
   strip.querySelectorAll('[data-cancel]').forEach((a) => a.onclick = (e) => { e.preventDefault(); api.qCancel(a.dataset.cancel).then(() => toast('Cancelled')); });
@@ -85,6 +86,18 @@ async function showDiagnostics() {
 }
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function fmtSecs(s) { s = Math.max(0, Math.round(s)); return s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`; }
+
+// A small SVG fill-ring showing pct (0..1).
+function ring(pct) {
+  const r = 7, C = 2 * Math.PI * r;
+  const off = C * (1 - Math.max(0, Math.min(1, pct)));
+  return `<svg width="16" height="16" viewBox="0 0 18 18" style="vertical-align:middle">
+    <circle cx="9" cy="9" r="${r}" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="2.5"/>
+    <circle cx="9" cy="9" r="${r}" fill="none" stroke="var(--accent,#6cf)" stroke-width="2.5" stroke-linecap="round"
+      stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 9 9)"/></svg>`;
+}
 
 export function mount() {
   on('resources', renderRes);
