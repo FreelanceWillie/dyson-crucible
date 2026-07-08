@@ -94,68 +94,9 @@ function Have-Cmd($name) {
     return ($null -ne $c)
 }
 
-# Re-read PATH from the registry so tools installed in THIS session are found
-# without opening a new terminal.
-function Refresh-Path {
-    $m = [Environment]::GetEnvironmentVariable("Path", "Machine")
-    $u = [Environment]::GetEnvironmentVariable("Path", "User")
-    $env:Path = (@($m, $u) | Where-Object { $_ }) -join ";"
-}
-
-# Is a real Python 3.10+ available (via py launcher or python)? Ignores the
-# Microsoft Store stub (it fails the version check).
-function Test-Python310 {
-    foreach ($cand in @(@("py", @("-3")), @("python", @()), @("python3", @()))) {
-        try {
-            $v = (& $cand[0] @($cand[1]) --version) 2>&1
-            if ($LASTEXITCODE -eq 0 -and "$v" -match "Python (\d+)\.(\d+)") {
-                if ((([int]$Matches[1] -eq 3) -and ([int]$Matches[2] -ge 10)) -or ([int]$Matches[1] -gt 3)) { return $true }
-            }
-        } catch {}
-    }
-    return $false
-}
-
-# Ensure Python 3.10+: winget first, then the official installer (silent), then
-# refresh PATH and re-check. Returns $true if Python is usable afterwards.
-function Ensure-Python {
-    if (Test-Python310) { Ok "Python 3.10+ found."; return $true }
-    Info "Python 3.10+ not found. Installing it for you..."
-    if (Have-Cmd "winget") {
-        try { winget install --id Python.Python.3.12 -e --source winget --accept-package-agreements --accept-source-agreements --silent } catch {}
-        Refresh-Path
-        if (Test-Python310) { Ok "Python installed (winget)."; return $true }
-    }
-    # Fallback: download + silent-install the official python.org build.
-    $ver = "3.12.7"
-    $exe = Join-Path $env:TEMP "python-$ver-amd64.exe"
-    try {
-        Info "Downloading the Python installer..."
-        $ProgressPreference = "SilentlyContinue"
-        Invoke-WebRequest "https://www.python.org/ftp/python/$ver/python-$ver-amd64.exe" -OutFile $exe -UseBasicParsing -ErrorAction Stop
-        Info "Installing Python (silent, adds it to PATH)..."
-        Start-Process $exe -ArgumentList "/quiet", "InstallAllUsers=0", "PrependPath=1", "Include_launcher=1" -Wait
-        Refresh-Path
-    } catch { Warn "Python auto-install hit a problem: $_" }
-    if (Test-Python310) { Ok "Python installed."; return $true }
-    Warn "Could not auto-install Python."
-    Manual "Install Python 3.12 from https://www.python.org/downloads/ (tick 'Add python.exe to PATH'), then double-click this again."
-    return $false
-}
-
-# Ensure Git (needed for ComfyUI custom nodes / feature packs). Best-effort.
-function Ensure-Git {
-    if (Have-Cmd "git") { Ok "Git found."; return $true }
-    Info "Git not found. Installing it for you..."
-    if (Have-Cmd "winget") {
-        try { winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements --silent } catch {}
-        Refresh-Path
-    }
-    if (Have-Cmd "git") { Ok "Git installed."; return $true }
-    Warn "Could not auto-install Git. The app still runs, but custom nodes / feature packs need it."
-    Manual "Install Git from https://git-scm.com/download/win, then double-click this again."
-    return $false
-}
+# Prerequisite self-assembly (Python 3.10+, Git) lives in one shared file so the
+# update path (setup.ps1) uses the exact same logic. Ensure-Python / Ensure-Git.
+. (Join-Path $RepoRoot "tools\prereqs.ps1")
 
 # Download helper: idempotent, prints size when done, never throws.
 function Get-File($url, $dest, $label) {

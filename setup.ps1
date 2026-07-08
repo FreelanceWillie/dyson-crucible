@@ -17,35 +17,14 @@ Write-Host ""
 # ---------------------------------------------------------------------
 # 1. Python 3.10+
 # ---------------------------------------------------------------------
-Write-Host "[1/8] Checking Python..." -ForegroundColor Yellow
-# Find a REAL Python 3.10+. Try the Windows launcher (py) FIRST -- bare 'python' on
-# many Windows machines is the Microsoft Store stub that just prints "Python was not
-# found". Store each candidate as exe + prefix args (e.g. 'py' '-3').
-$PyExe = $null; $PyArgs = @()
-foreach ($cand in @(@("py", @("-3")), @("python", @()), @("python3", @()))) {
-    $exe = $cand[0]; $pre = $cand[1]
-    try {
-        $v = (& $exe @pre --version) 2>&1
-        if ($LASTEXITCODE -eq 0 -and "$v" -match "Python (\d+)\.(\d+)") {
-            $maj = [int]$Matches[1]; $min = [int]$Matches[2]
-            if (($maj -eq 3 -and $min -ge 10) -or ($maj -gt 3)) {
-                $PyExe = $exe; $PyArgs = $pre
-                Write-Host "      Found: $v  (using '$exe $($pre -join ' ')')"
-                break
-            }
-        }
-    } catch {}
-}
-
-if (-not $PyExe) {
-    Write-Host ""
-    Write-Host "  Python 3.10 or newer is required and was not found." -ForegroundColor Red
-    Write-Host "  Install it from:  https://www.python.org/downloads/" -ForegroundColor Red
-    Write-Host "  (Tick 'Add python.exe to PATH' in the installer.)" -ForegroundColor Red
-    Write-Host "  If Python IS installed and 'py --version' works, just re-run this." -ForegroundColor Red
-    Write-Host ""
-    exit 1
-}
+Write-Host "[1/8] Checking Python (installs/upgrades it if needed)..." -ForegroundColor Yellow
+# Shared self-assembly helpers (also used by bootstrap.ps1). This INSTALLS Python
+# 3.10+ if the machine has none or only an older one (e.g. 3.9), so the update path
+# self-heals too -- not just first-time install.
+. (Join-Path $PSScriptRoot "tools\prereqs.ps1")
+$py = Ensure-Python
+if (-not $py) { exit 1 }
+$PyExe = $py.Exe; $PyArgs = $py.Args
 
 # ---------------------------------------------------------------------
 # 2. Virtual environment
@@ -58,6 +37,15 @@ $venvPy = ".\.venv\Scripts\python.exe"
 if ((Test-Path ".venv") -and -not (Test-Path $venvPy)) {
     Write-Host "      .venv looks incomplete (interrupted install); rebuilding it..." -ForegroundColor Yellow
     Remove-Item ".venv" -Recurse -Force -ErrorAction SilentlyContinue
+}
+# Also rebuild if the existing venv was made with an OLD Python (< 3.10) -- e.g. a
+# venv built before we upgraded Python. Otherwise we'd reuse a 3.9 venv.
+if (Test-Path $venvPy) {
+    $vv = (& $venvPy --version) 2>&1
+    if (-not ("$vv" -match "Python (\d+)\.(\d+)" -and ((([int]$Matches[1] -eq 3) -and ([int]$Matches[2] -ge 10)) -or ([int]$Matches[1] -gt 3)))) {
+        Write-Host "      .venv uses an old Python ($vv); rebuilding with $($PyExe)..." -ForegroundColor Yellow
+        Remove-Item ".venv" -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 if (-not (Test-Path $venvPy)) {
     & $PyExe @PyArgs -m venv .venv
