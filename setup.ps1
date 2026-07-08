@@ -70,6 +70,9 @@ Write-Host ""
 Write-Host "[3/8] Installing torch + torchvision (CUDA 12.1)..." -ForegroundColor Yellow
 Write-Host "      This download is large. Go make a coffee."
 # CPU-only users: drop the --index-url line below. It will run, just slowly.
+# Install torch + torchvision from the CUDA index. NOT torchaudio: we don't need
+# it (only ComfyUI audio nodes use it, and they fail gracefully), and a mismatched
+# torchaudio triggers a fatal DLL error (torch_library_impl / _torchaudio.pyd).
 & $venvPy -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 # ---------------------------------------------------------------------
