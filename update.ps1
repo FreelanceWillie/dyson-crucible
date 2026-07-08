@@ -8,7 +8,9 @@
 
 $ErrorActionPreference = "Continue"
 $RepoRoot   = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ComfyRoots = @("E:/Tools/ComfyUI", (Join-Path $RepoRoot "..\ComfyUI"))
+$ComfyRoots = @()
+if ($env:DC_COMFYUI_ROOT) { $ComfyRoots += $env:DC_COMFYUI_ROOT }
+$ComfyRoots += (Join-Path (Split-Path $RepoRoot -Parent) "ComfyUI")
 
 function Say($m)  { Write-Host "[update] $m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host "[ok]     $m" -ForegroundColor Green }

@@ -272,8 +272,16 @@ def export_zip(paths: List[str], out_path: str) -> str:
 
 def _comfy_output_dir(cfg: Dict[str, Any]) -> Optional[str]:
     root = (cfg.get("comfyui") or {}).get("root") or ""
-    for c in ([os.path.join(root, "output"), os.path.join(root, "ComfyUI", "output")] if root else []) + \
-             ["E:/Tools/ComfyUI/ComfyUI/output", "E:/ComfyUI/output"]:
+    cands = []
+    if root:
+        cands += [os.path.join(root, "output"), os.path.join(root, "ComfyUI", "output")]
+    env = os.environ.get("DC_COMFYUI_ROOT")
+    if env:
+        cands += [os.path.join(env, "output"), os.path.join(env, "ComfyUI", "output")]
+    parent = os.path.dirname(_cfg.REPO_ROOT)  # sibling ComfyUI next to the repo
+    cands += [os.path.join(parent, "ComfyUI", "output"),
+              os.path.join(parent, "ComfyUI", "ComfyUI", "output")]
+    for c in cands:
         if os.path.isdir(c):
             return c
     return None

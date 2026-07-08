@@ -27,8 +27,10 @@ $ErrorActionPreference = "Continue"
 # ---------------------------------------------------------------------
 #  EDIT-ME URLs and paths  (verify / bump these here in one place)
 # ---------------------------------------------------------------------
-$RepoRoot     = "E:/Tools/art-conductor"
-$ComfyUIRoot  = "E:/Tools/ComfyUI"
+# Portable: the repo is wherever this script lives. ComfyUI installs as a sibling
+# folder next to the repo by default (override with the DC_COMFYUI_ROOT env var).
+$RepoRoot     = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+$ComfyUIRoot  = if ($env:DC_COMFYUI_ROOT) { $env:DC_COMFYUI_ROOT } else { Join-Path (Split-Path $RepoRoot -Parent) "ComfyUI" }
 
 # ComfyUI standalone portable (official 7z on GitHub releases). If the
 # version tag moves, update this ONE line. "latest" release page:

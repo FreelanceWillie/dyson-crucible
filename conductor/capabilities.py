@@ -36,12 +36,14 @@ def _comfy_root(cfg: Dict[str, Any]) -> Optional[str]:
     cands = []
     if root:
         cands += [root, os.path.join(root, "ComfyUI")]
+    # portable fallbacks: env override, then a sibling ComfyUI next to the repo.
+    env = os.environ.get("DC_COMFYUI_ROOT")
+    if env:
+        cands += [env, os.path.join(env, "ComfyUI")]
+    parent = os.path.dirname(_cfg.REPO_ROOT)
+    cands += [os.path.join(parent, "ComfyUI"), os.path.join(parent, "ComfyUI", "ComfyUI")]
     for c in cands:
         if c and os.path.isdir(os.path.join(c, "models")):
-            return c
-    # last resort: a sibling ComfyUI checkout
-    for c in ("E:/Tools/ComfyUI/ComfyUI", "E:/ComfyUI"):
-        if os.path.isdir(os.path.join(c, "models")):
             return c
     return None
 
