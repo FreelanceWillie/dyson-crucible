@@ -74,11 +74,14 @@ function Set-ComfyConfig($configPath, $root, $launcher) {
 # came up. Proves the engine actually works (not just that files exist).
 function Test-ComfyLaunch($launcher) {
     Write-Host "      Test-launching ComfyUI. First time is slow (imports + nodes)."
-    $log = Join-Path $env:TEMP "dc_comfy_verify.log"
-    if (Test-Path $log) { Remove-Item $log -Force -ErrorAction SilentlyContinue }
+    # PowerShell requires DIFFERENT files for stdout vs stderr; we tail whichever
+    # was written most recently for the live status line.
+    $logOut = Join-Path $env:TEMP "dc_comfy_verify.out.log"
+    $logErr = Join-Path $env:TEMP "dc_comfy_verify.err.log"
+    foreach ($f in @($logOut, $logErr)) { if (Test-Path $f) { Remove-Item $f -Force -ErrorAction SilentlyContinue } }
     $proc = $null
     # Capture the engine's output so we can show WHAT it is doing while it loads.
-    try { $proc = Start-Process -FilePath $launcher -PassThru -WindowStyle Minimized -RedirectStandardOutput $log -RedirectStandardError $log } catch {
+    try { $proc = Start-Process -FilePath $launcher -PassThru -WindowStyle Minimized -RedirectStandardOutput $logOut -RedirectStandardError $logErr } catch {
         try { $proc = Start-Process -FilePath $launcher -PassThru -WindowStyle Minimized } catch { return $false }
     }
     $ok = $false
@@ -91,12 +94,23 @@ function Test-ComfyLaunch($launcher) {
         # live status line: spinner + elapsed + the last thing ComfyUI printed
         $secs = [int]((Get-Date) - $t0).TotalSeconds
         $last = ""
-        try { if (Test-Path $log) { $last = (Get-Content $log -Tail 1 -ErrorAction SilentlyContinue) } } catch {}
+        try {
+            $newest = @($logOut, $logErr) | Where-Object { Test-Path $_ } | Sort-Object { (Get-Item $_).LastWriteTime } -Descending | Select-Object -First 1
+            if ($newest) { $last = (Get-Content $newest -Tail 1 -ErrorAction SilentlyContinue) }
+        } catch {}
         if ($last.Length -gt 70) { $last = $last.Substring(0, 70) }
         Write-Host ("`r      $($spin[$i % 4]) waiting for ComfyUI  ${secs}s   $last".PadRight(110)) -NoNewline
         Start-Sleep -Seconds 2
     }
     Write-Host ""   # end the status line
+    if (-not $ok) {
+        Write-Host "      ComfyUI did not respond. Last lines of its output:" -ForegroundColor Red
+        foreach ($f in @($logErr, $logOut)) {
+            if ((Test-Path $f) -and ((Get-Item $f).Length -gt 0)) {
+                Get-Content $f -Tail 15 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "        $_" -ForegroundColor DarkGray }
+            }
+        }
+    }
     # Stop the test instance; the app relaunches ComfyUI itself when it needs it.
     try {
         $cons = Get-NetTCPConnection -LocalPort 8188 -State Listen -ErrorAction SilentlyContinue
