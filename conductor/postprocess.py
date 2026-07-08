@@ -536,17 +536,39 @@ def step_pixelate(in_path, params, out_path):
     smooth = bool(p.get("smooth", True))
     im = Image.open(in_path).convert("RGBA")
     w, h = im.size
+    sw, sh = max(1, w // px), max(1, h // px)
     if smooth:
         # Median-filter the RGB (kills single-pixel speckle) then area-average
         # downscale so each output pixel is a true block average, not one sample.
         rgb = im.convert("RGB").filter(ImageFilter.MedianFilter(3))
         alpha = im.split()[3]
-        small_rgb = rgb.resize((max(1, w // px), max(1, h // px)), Image.BOX)
-        small_a = alpha.resize((max(1, w // px), max(1, h // px)), Image.BOX)
-        small = small_rgb.convert("RGBA")
-        small.putalpha(small_a)
+        # ALPHA-AWARE downscale: premultiply RGB by alpha so transparent pixels
+        # contribute ZERO (not their stale under-color) to the block average.
+        # Without this, a cut-out subject bleeds its transparent background color
+        # into every edge pixel -> a fuzzy halo. Compositing over black premultiplies.
+        black = Image.new("RGB", im.size, (0, 0, 0))
+        premult = Image.composite(rgb, black, alpha)
+        pm_s = premult.resize((sw, sh), Image.BOX)
+        a_s = alpha.resize((sw, sh), Image.BOX)
+        np = _np()
+        if np is not None:
+            a = np.asarray(a_s).astype("float32") / 255.0
+            pm = np.asarray(pm_s).astype("float32")
+            # un-premultiply so edge pixels are the PURE subject color, then snap
+            # alpha hard (0/255) for a crisp pixel edge instead of a soft ramp.
+            safe = np.clip(a[..., None], 1e-3, 1.0)
+            rgb_s = np.clip(pm / safe, 0, 255).astype("uint8")
+            a_hard = (a >= 0.5).astype("uint8") * 255
+            small = Image.fromarray(rgb_s, "RGB").convert("RGBA")
+            small.putalpha(Image.fromarray(a_hard, "L"))
+        else:
+            # No numpy: still better than blending bg -- hard-threshold alpha so
+            # edges are crisp; RGB keeps the premultiplied average (edges darken
+            # slightly but no bright-bg halo).
+            small = pm_s.convert("RGBA")
+            small.putalpha(a_s.point(lambda v: 255 if v >= 128 else 0))
     else:
-        small = im.resize((max(1, w // px), max(1, h // px)), Image.NEAREST)
+        small = im.resize((sw, sh), Image.NEAREST)
     if colors > 0:
         alpha = small.split()[3]
         snapped = small.convert("RGB").quantize(colors=colors, dither=Image.Dither.NONE).convert("RGBA")
