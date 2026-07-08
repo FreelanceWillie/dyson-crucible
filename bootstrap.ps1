@@ -37,6 +37,9 @@ $ComfyUIPortableUrl = "https://github.com/comfyanonymous/ComfyUI/releases/latest
 # Fallback if the portable download is unavailable: plain git clone.
 $ComfyUIGitUrl      = "https://github.com/comfyanonymous/ComfyUI"
 $IPAdapterGitUrl    = "https://github.com/cubiq/ComfyUI_IPAdapter_plus"
+# LayerDiffuse: native transparent-background generation (gen.transparent: native).
+# Optional; the tool works without it (gen.transparent: cut uses rembg instead).
+$LayerDiffuseGitUrl = "https://github.com/huchenlei/ComfyUI-layerdiffuse"
 
 # --- Model source URLs (HuggingFace direct download links) -----------
 # SD1.5 base checkpoint. Comfy-Org mirror (the original runwayml repo was removed from HF).
@@ -269,6 +272,50 @@ if (Test-Path $ipNodeDir) {
         Warn "git is not installed."
         Manual "Install git, then run:  git clone $IPAdapterGitUrl `"$ipNodeDir`""
     }
+}
+
+# =====================================================================
+#  [4b] ComfyUI-layerdiffuse custom node (OPTIONAL: native transparent gen)
+# =====================================================================
+Step 4 "Installing ComfyUI-layerdiffuse (optional: true transparent-background gen)..."
+$ldNodeDir = Join-Path $NodesDir "ComfyUI-layerdiffuse"
+if (Test-Path $ldNodeDir) {
+    Ok "ComfyUI-layerdiffuse already present; re-applying compatibility patch."
+} elseif (-not (Test-Path $NodesDir)) {
+    Warn "custom_nodes folder not found; skipping LayerDiffuse (optional)."
+    Manual "Later:  git clone $LayerDiffuseGitUrl `"$ldNodeDir`"  then  python tools/patch_layerdiffuse.py `"$ldNodeDir`""
+} elseif (Have-Cmd "git") {
+    try {
+        if (-not (Test-Path $ldNodeDir)) {
+            Info "Cloning ComfyUI-layerdiffuse into custom_nodes..."
+            git clone $LayerDiffuseGitUrl $ldNodeDir
+        }
+        # Install the node's Python deps into ComfyUI's embedded python (portable).
+        $embPy = Join-Path $ComfyUIRoot "python_embeded/python.exe"
+        $ldReqs = Join-Path $ldNodeDir "requirements.txt"
+        if ((Test-Path $embPy) -and (Test-Path $ldReqs)) {
+            Info "Installing LayerDiffuse deps into ComfyUI's python..."
+            & $embPy -m pip install -r $ldReqs 2>&1 | Out-Null
+        }
+        # Apply our compatibility patch (the upstream node breaks on current ComfyUI).
+        # Idempotent: safe to re-run. Uses whatever python is on PATH (pure file edits).
+        $patchPy = Join-Path $RepoRoot "tools/patch_layerdiffuse.py"
+        if (Test-Path $patchPy) {
+            $pyExe = if (Test-Path $embPy) { $embPy } elseif (Have-Cmd "python") { "python" } else { $null }
+            if ($pyExe) {
+                & $pyExe $patchPy $ldNodeDir
+                if ($?) { Ok "LayerDiffuse installed + patched (set gen.transparent: native to use it)." }
+            } else {
+                Warn "No python found to apply the LayerDiffuse patch."
+                Manual "Run:  python tools/patch_layerdiffuse.py `"$ldNodeDir`""
+            }
+        }
+    } catch {
+        Warn "LayerDiffuse install/patch hit a problem (optional; 'cut' mode still works)."
+        Manual "Manual:  git clone $LayerDiffuseGitUrl `"$ldNodeDir`"  then  python tools/patch_layerdiffuse.py `"$ldNodeDir`""
+    }
+} else {
+    Warn "git not installed; skipping LayerDiffuse (optional)."
 }
 
 # =====================================================================

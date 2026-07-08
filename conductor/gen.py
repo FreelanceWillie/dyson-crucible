@@ -110,6 +110,63 @@ def _load_workflow_template(cfg: Dict[str, Any]) -> Dict[str, Any]:
     return wf
 
 
+def _transparent_mode(brief: Dict[str, Any], cfg: Dict[str, Any]) -> str:
+    """Resolve the transparent-background mode: '' (off), 'cut' (generate then
+    rembg the background off), or 'native' (LayerDiffuse true-alpha generation).
+    Per-brief 'transparent' overrides gen.transparent. Accepts bool or string."""
+    gen_cfg = cfg.get("gen", {}) or {}
+    val = brief.get("transparent", gen_cfg.get("transparent", False))
+    if isinstance(val, str):
+        v = val.strip().lower()
+        if v in ("native", "layerdiffuse", "layer_diffuse"):
+            return "native"
+        if v in ("cut", "rembg", "true", "1", "yes", "on"):
+            return "cut"
+        return ""
+    return "cut" if val else ""
+
+
+def _load_layerdiffuse_template(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """Load the SD1.5 LayerDiffuse (native transparent) API workflow."""
+    rel = (cfg.get("comfyui", {}) or {}).get(
+        "workflow_layerdiffuse", "workflows/sd15_layerdiffuse.json"
+    )
+    wf_path = _cfg.resolve(rel)
+    with open(wf_path, "r", encoding="utf-8") as fh:
+        wf = json.load(fh)
+    wf.pop("_doc", None)
+    return wf
+
+
+def _build_workflow_layerdiffuse(
+    brief: Dict[str, Any], cfg: Dict[str, Any], template: Dict[str, Any], seed: int
+) -> Dict[str, Any]:
+    """Inject prompt/checkpoint/size/seed into the LayerDiffuse workflow. The graph
+    is fixed (KSampler already reads the LayeredDiffusionApply model, SaveImage
+    reads the RGBA decode), so this only fills the leaf fields, no IP-Adapter
+    rewiring."""
+    wf = copy.deepcopy(template)
+    comfy = cfg.get("comfyui", {}) or {}
+    gen = cfg.get("gen", {}) or {}
+    prompt = (brief.get("prompt") or "").strip()
+    positive = f"{prompt}, {_STYLE_SUFFIX}" if prompt else _STYLE_SUFFIX
+    negative = (brief.get("negative") or "").strip()
+
+    wf[_NODE_CHECKPOINT]["inputs"]["ckpt_name"] = comfy.get(
+        "checkpoint", "v1-5-pruned-emaonly.safetensors"
+    )
+    wf[_NODE_POS]["inputs"]["text"] = positive
+    wf[_NODE_NEG]["inputs"]["text"] = negative
+    # LayerDiffuse's transparent VAE decoder requires 64-aligned dimensions.
+    wf[_NODE_LATENT]["inputs"]["width"] = (int(gen.get("width", 512)) // 64) * 64
+    wf[_NODE_LATENT]["inputs"]["height"] = (int(gen.get("height", 512)) // 64) * 64
+    ks = wf[_NODE_KSAMPLER]["inputs"]
+    ks["seed"] = seed
+    ks["steps"] = int(gen.get("steps", 28))
+    ks["cfg"] = float(gen.get("cfg", 7.0))
+    return wf
+
+
 def _load_multi_workflow_template(cfg: Dict[str, Any]) -> Dict[str, Any]:
     """Load the multi-IP-Adapter API-format workflow (cfg['comfyui']['workflow_multi'])."""
     rel = (cfg.get("comfyui", {}) or {}).get(
@@ -418,6 +475,42 @@ def _generate_comfyui(
             "auto-launch, or start ComfyUI manually."
         )
 
+    # NATIVE transparent path (LayerDiffuse): a fixed graph that outputs true RGBA.
+    # No IP-Adapter / multi / LoRA rewiring; just fill the leaf fields per candidate.
+    if _transparent_mode(brief, cfg) == "native":
+        try:
+            ld_template = _load_layerdiffuse_template(cfg)
+        except Exception as exc:  # noqa: BLE001 - fall back to normal gen if missing
+            print(f"[gen] LayerDiffuse workflow unavailable ({exc}); using normal gen")
+        else:
+            os.makedirs(out_dir, exist_ok=True)
+            results: List[str] = []
+            for i in range(1, n + 1):
+                last_err: Optional[Exception] = None
+                for attempt in range(max_retries + 1):
+                    try:
+                        wf = _build_workflow_layerdiffuse(
+                            brief, cfg, ld_template, _seed_for(i + attempt)
+                        )
+                        prompt_id = _comfyui.submit(url, wf, _comfyui.new_client_id())
+                        images = _comfyui.wait(url, prompt_id)
+                        if not images:
+                            raise RuntimeError("ComfyUI returned no images")
+                        dest = os.path.join(out_dir, f"cand_{i}.png")
+                        shutil.copyfile(images[0], dest)
+                        results.append(dest)
+                        break
+                    except Exception as exc:  # noqa: BLE001
+                        last_err = exc
+                        print(f"[gen] transparent candidate {i} attempt {attempt + 1} failed: {exc}")
+                        if not _comfyui.is_up(url):
+                            _comfyui.ensure_up(cfg)
+                else:
+                    raise RuntimeError(
+                        f"transparent candidate {i} failed after {max_retries + 1} attempts: {last_err}"
+                    )
+            return results
+
     # Decide single vs multi. Multi is used only when the brief carries a
     # non-empty, well-formed refs list (guarded so a malformed one degrades to
     # the single-ref path rather than crashing).
@@ -598,14 +691,13 @@ def generate(brief: Dict[str, Any], n: int, out_dir: str, cfg: Dict[str, Any]) -
     else:
         results = _generate_comfyui(brief, n, out_dir, cfg)
 
-    # Optional: transparent-background candidates by default. SD1.5 has no native
-    # alpha channel, so "transparent gen" = generate normally, then auto-cut the
-    # background off each candidate with rembg (the same bg_remove post step).
-    # Enable with gen.transparent: true (or per-brief brief['transparent']).
-    # Graceful: if rembg is missing or a cut fails, the original candidate stands.
-    gen_cfg = cfg.get("gen") or {}
-    want_transparent = bool(brief.get("transparent", gen_cfg.get("transparent", False)))
-    if want_transparent and results:
+    # Transparent-background candidates. Two modes (see _transparent_mode):
+    #   'native' -> LayerDiffuse already produced true RGBA in _generate_comfyui;
+    #               nothing to do here.
+    #   'cut'    -> SD has no alpha, so auto-cut the background off each candidate
+    #               with rembg (the same bg_remove post step). Graceful: if rembg
+    #               is missing or a cut fails, the original candidate stands.
+    if _transparent_mode(brief, cfg) == "cut" and results:
         try:
             try:
                 import postprocess as _pp

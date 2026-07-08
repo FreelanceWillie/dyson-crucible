@@ -1,0 +1,50 @@
+{
+  "_doc": {
+    "purpose": "SD1.5 NATIVE transparent-background generation via ComfyUI-layerdiffuse.",
+    "how": "LayeredDiffusionApply (SD1.5 attn-sharing) patches the model; a normal KSampler + VAEDecode run; LayeredDiffusionDecodeRGBA turns the result into a true RGBA image (real alpha, no background-removal step). Selected when gen.transparent == 'native'.",
+    "requires": "The ComfyUI-layerdiffuse custom node (installed by bootstrap.ps1) plus its auto-downloaded SD1.5 models (layer_sd15_transparent_attn + layer_sd15_vae_transparent_decoder).",
+    "injected_by_gen_py": "node 4 ckpt_name, 6 positive text, 7 negative text, 5 width/height, 3 seed/steps/cfg/sampler. Node ids match the other workflow templates so gen.py reuses the same field names.",
+    "node_10": "LayeredDiffusionApply config MUST be exactly 'SD15, Attention Injection, attn_sharing' (verified against the node's object_info).",
+    "node_11": "LayeredDiffusionDecodeRGBA sd_version MUST be 'SD15'."
+  },
+  "3": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0, "steps": 30, "cfg": 7.0,
+      "sampler_name": "dpmpp_2m", "scheduler": "karras", "denoise": 1.0,
+      "model": ["10", 0], "positive": ["6", 0], "negative": ["7", 0], "latent_image": ["5", 0]
+    }
+  },
+  "4": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": { "ckpt_name": "v1-5-pruned-emaonly.safetensors" }
+  },
+  "5": {
+    "class_type": "EmptyLatentImage",
+    "inputs": { "width": 512, "height": 768, "batch_size": 1 }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "", "clip": ["4", 1] }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "", "clip": ["4", 1] }
+  },
+  "10": {
+    "class_type": "LayeredDiffusionApply",
+    "inputs": { "model": ["4", 0], "config": "SD15, Attention Injection, attn_sharing", "weight": 1.0 }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["3", 0], "vae": ["4", 2] }
+  },
+  "11": {
+    "class_type": "LayeredDiffusionDecodeRGBA",
+    "inputs": { "samples": ["3", 0], "images": ["8", 0], "sd_version": "SD15", "sub_batch_size": 16 }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": { "filename_prefix": "dc_ld", "images": ["11", 0] }
+  }
+}

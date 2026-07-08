@@ -45,6 +45,7 @@ comfyui:
                                     # auto-detect near comfyui.exe.
   workflow: workflows/sd15_ipadapter.json       # single-reference template (API format)
   workflow_multi: workflows/sd15_multi_ipadapter.json  # multi-image (style + subject) template
+  workflow_layerdiffuse: workflows/sd15_layerdiffuse.json  # native transparent gen (gen.transparent: native)
   checkpoint: v1-5-pruned-emaonly.safetensors  # SD1.5 checkpoint filename in ComfyUI/models/checkpoints
   ip_adapter_preset: PLUS           # IP-Adapter preset node value
 
@@ -86,14 +87,18 @@ gen:
   width: 512                        # 512 is the safe size for a 4GB GPU (SD1.5 native)
   height: 512
   ip_adapter: true                  # steer with reference images (IP-Adapter)
-  transparent: false                # transparent-background candidates by default.
-                                    # SD1.5 has NO native alpha channel, so this
-                                    # generates normally then auto-cuts the bg off
-                                    # each candidate with rembg. Set true for sprite
-                                    # work. (True native transparent gen needs the
-                                    # heavy LayerDiffuse node + model, not worth it
-                                    # on a 4GB card; see docs/SETUP.md.) Per-brief
-                                    # override: set transparent: true on the brief.
+  transparent: false                # transparent-background candidates. Values:
+                                    #   false  = off (opaque candidates)
+                                    #   cut    = generate normally, then auto-cut the
+                                    #            background off with rembg (works on
+                                    #            any checkpoint, no extra install)
+                                    #   native = TRUE transparent generation via
+                                    #            LayerDiffuse (real alpha, cleaner
+                                    #            edges, keeps wispy bits rembg eats).
+                                    #            Needs the ComfyUI-layerdiffuse node
+                                    #            (bootstrap installs it) + its models
+                                    #            (auto-download on first use).
+                                    # Per-brief override: set transparent on the brief.
   n_candidates: 4                   # how many images to gen per run
   # --- LoRAs ---
   # LoRAs are per-asset, NOT global: set them on the brief as

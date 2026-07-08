@@ -81,17 +81,18 @@ download failed during setup, this is where you will see it.
 Stable Diffusion 1.5 has no native alpha channel, so it cannot draw on true
 transparency by itself. Two ways to get transparent PNGs, from easy to advanced:
 
-1. **Recommended (built in, zero setup).** Generate normally, then cut the
-   background off. Either flip `gen.transparent: true` in `config.yaml` (every
-   candidate comes out pre-cut), or after picking a winner run the **`game_sprite`**
-   or **`pixel_sprite`** look-lab preset. Both use `rembg` to remove the
-   background and give you a clean RGBA PNG (the pixel one cuts *first*, then
-   pixelates, so there is no white halo on the edges). This works great and needs
-   nothing extra.
+1. **Auto-cut (`gen.transparent: cut`).** Generate normally, then cut the
+   background off each candidate with `rembg`. Works on any checkpoint, no extra
+   install. You can also just run the **`game_sprite`** or **`pixel_sprite`**
+   look-lab preset after picking a winner (the pixel one cuts *first*, then
+   pixelates, so there is no white halo on the edges).
 
-2. **Advanced (native, optional).** For true transparent *generation* you can add
-   the [ComfyUI-LayerDiffuse](https://github.com/huchenlei/ComfyUI-layerdiffuse)
-   custom node plus its transparent model. It renders real alpha directly, but it
-   is an extra ~1.5GB download and uses more VRAM, which is tight on a 4GB card.
-   Only bother if the auto-cut in option 1 is not clean enough for a specific
-   asset. Most users never need this.
+2. **Native (`gen.transparent: native`).** True transparent *generation* via
+   LayerDiffuse: the model renders real alpha directly, with cleaner edges that
+   keep wispy bits (hair, glow, smoke) that `rembg` tends to eat. `bootstrap.ps1`
+   installs the [ComfyUI-layerdiffuse](https://github.com/huchenlei/ComfyUI-layerdiffuse)
+   node for you and applies a small compatibility patch (the upstream node is
+   unmaintained and otherwise breaks on current ComfyUI). Its ~330MB models
+   download automatically the first time you use it. Uses a bit more VRAM but runs
+   fine on a 4GB card at 512. If you ever reinstall the node by hand, re-apply the
+   patch with:  `python tools/patch_layerdiffuse.py <path-to-ComfyUI-layerdiffuse>`
