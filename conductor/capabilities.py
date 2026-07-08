@@ -152,34 +152,57 @@ def status(cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Dict[str, Any]]:
 
 # --- Install ----------------------------------------------------------------
 
-def _download(url: str, dest: str, log: Callable[[str], None]) -> bool:
-    if os.path.isfile(dest) and os.path.getsize(dest) > 1024:
-        log("  have " + os.path.basename(dest)); return True
-    os.makedirs(os.path.dirname(dest), exist_ok=True)
-    tmp = dest + ".part"
-    log("  downloading " + os.path.basename(dest) + " ...")
+def _remote_size(url: str) -> int:
+    """HEAD-ish: return the server's Content-Length, or 0 if unknown."""
     try:
-        with urllib.request.urlopen(url) as r, open(tmp, "wb") as f:
-            total = int(r.headers.get("Content-Length") or 0)
-            done = 0
-            while True:
-                chunk = r.read(1 << 20)
-                if not chunk:
-                    break
-                f.write(chunk); done += len(chunk)
-                if total:
-                    log("  %s %d%%" % (os.path.basename(dest), done * 100 // total))
-        os.replace(tmp, dest)
-        log("  done " + os.path.basename(dest))
-        return True
-    except Exception as e:
-        log("  FAILED " + os.path.basename(dest) + ": " + str(e))
+        req = urllib.request.Request(url, method="HEAD")
+        with urllib.request.urlopen(req) as r:
+            return int(r.headers.get("Content-Length") or 0)
+    except Exception:
+        return 0
+
+
+def _download(url: str, dest: str, log: Callable[[str], None]) -> bool:
+    """Download with size verification + resume. HF connections drop mid-stream and
+    a partial file passes a naive 'exists' check but is corrupt (safetensors then
+    fails to load). We compare against the remote Content-Length and RESUME with a
+    Range request until the file is complete, retrying a few times."""
+    name = os.path.basename(dest)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    expected = _remote_size(url)
+    if os.path.isfile(dest) and expected and os.path.getsize(dest) >= expected:
+        log("  have " + name); return True
+
+    for attempt in range(6):
+        have = os.path.getsize(dest) if os.path.isfile(dest) else 0
+        if expected and have >= expected:
+            log("  done " + name); return True
+        headers = {"Range": "bytes=%d-" % have} if have else {}
         try:
-            if os.path.isfile(tmp):
-                os.remove(tmp)
-        except Exception:
-            pass
-        return False
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req) as r, open(dest, "ab" if have else "wb") as f:
+                # If the server ignored Range (200 not 206), restart from scratch.
+                if have and r.status == 200:
+                    f.close(); open(dest, "wb").close()
+                    f = open(dest, "wb"); have = 0
+                total = (int(r.headers.get("Content-Length") or 0) + have) or expected
+                while True:
+                    chunk = r.read(1 << 20)
+                    if not chunk:
+                        break
+                    f.write(chunk); have += len(chunk)
+                    if total:
+                        log("  %s %d%%" % (name, min(100, have * 100 // total)))
+        except Exception as e:
+            log("  retry %d %s: %s" % (attempt + 1, name, e))
+            continue
+        if not expected:  # unknown remote size -> accept a non-empty file
+            if os.path.getsize(dest) > 1024:
+                log("  done " + name); return True
+
+    ok = os.path.isfile(dest) and (not expected or os.path.getsize(dest) >= expected)
+    log(("  done " if ok else "  FAILED (incomplete) ") + name)
+    return ok
 
 
 def _git_clone(url: str, dest: str, log: Callable[[str], None]) -> bool:
