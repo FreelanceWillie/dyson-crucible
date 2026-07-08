@@ -416,7 +416,17 @@ if (Test-Path $configPath) {
         Copy-Item $configPath $backup -Force
         Ok "Backed up config.yaml -> config.yaml.bak"
 
-        $lines = Get-Content $configPath
+        # Preserve an existing checkpoint choice. The user can pick a model in the
+        # app ("Art style engine"), and re-running bootstrap must NOT reset it to
+        # the default. Only (re)write the checkpoint line when config names none,
+        # or names a file that is not actually installed.
+        $setCkpt = $true
+        $curCkpt = ""
+        foreach ($l in $lines) {
+            if ($l -match '^\s*checkpoint:\s*(.+?)\s*(#.*)?$') { $curCkpt = $matches[1].Trim().Trim('"'); break }
+        }
+        if ($curCkpt -and (Test-Path (Join-Path $CkptDir $curCkpt))) { $setCkpt = $false }
+
         $out = New-Object System.Collections.Generic.List[string]
         foreach ($line in $lines) {
             if ($line -match '^(\s*)exe:\s*".*"') {
@@ -427,7 +437,7 @@ if (Test-Path $configPath) {
                 $indent = $matches[1]
                 $out.Add("$indent" + 'root: "' + $rootForYaml + '"          # set by bootstrap.ps1')
             }
-            elseif ($line -match '^(\s*)checkpoint:\s*\S') {
+            elseif ($setCkpt -and $line -match '^(\s*)checkpoint:\s*\S') {
                 $indent = $matches[1]
                 $out.Add("$indent" + 'checkpoint: ' + $CheckpointName + '  # set by bootstrap.ps1 (downloaded checkpoint)')
             }
@@ -439,6 +449,7 @@ if (Test-Path $configPath) {
         Ok "config.yaml wired:"
         Info "  comfyui.root = $rootForYaml"
         Info "  comfyui.exe  = $launcherForYaml"
+        if (-not $setCkpt) { Info "  comfyui.checkpoint kept: $curCkpt (your choice; not overwritten)" }
         if (-not (Test-Path $launcher)) {
             Warn "Note: that launcher .bat is not on disk yet (git-clone build has none)."
             Info "  If you used the source build, start ComfyUI with the repo .venv:"
