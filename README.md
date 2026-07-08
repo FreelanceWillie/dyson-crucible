@@ -4,7 +4,12 @@
 
 You do not draw. You describe, rate, and pick. It runs entirely on your own Windows PC with no accounts, no subscriptions, and nothing sent to the cloud. A local ComfyUI server does the image generation and a local Ollama model is the "brain" that turns your plain-language notes into better prompts. It learns your look from a handful of reference images, so every hero it makes looks like it belongs in your game.
 
-<!-- add a screenshot/GIF of the dashboard here -->
+<p align="center">
+  <img src="docs/demo/hero.png" width="30%" alt="A knight generated in the tool">
+  <img src="docs/demo/hero_gameboy.png" width="30%" alt="The same knight as a GameBoy-palette pixel sprite">
+  <img src="docs/demo/hero_duotone.png" width="30%" alt="The same knight as a duotone illustration">
+</p>
+<p align="center"><em>One prompt, generated locally on a home GPU, then restyled with the built-in look lab (raw, GameBoy pixel-art, duotone). All made in the app.</em></p>
 
 ---
 
