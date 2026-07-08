@@ -41,7 +41,7 @@ _CONFIG_PATH = os.path.join(REPO_ROOT, "config.yaml")
 # ---------------------------------------------------------------------------
 DEFAULTS: Dict[str, Any] = {
     "brain": "local",
-    "ollama_model": "qwen2.5:7b-instruct",
+    "ollama_model": "qwen2.5:3b-instruct",
     "ollama_url": "http://localhost:11434",
     "gemini_api_key_env": "GEMINI_API_KEY",
     "gemini_model": "gemini-2.0-flash",

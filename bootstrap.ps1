@@ -48,7 +48,7 @@ $UrlIpAdapterPlus = "https://huggingface.co/h94/IP-Adapter/resolve/main/models/i
 $UrlClipVision = "https://huggingface.co/h94/IP-Adapter/resolve/main/models/image_encoder/model.safetensors"
 
 # --- Ollama brain model ----------------------------------------------
-$OllamaModel = "qwen2.5:7b-instruct"
+$OllamaModel = "qwen2.5:3b-instruct"
 
 # --- Derived model destination paths ---------------------------------
 $CkptDir   = Join-Path $ComfyUIRoot "ComfyUI/models/checkpoints"

@@ -11,7 +11,7 @@
 brain: local
 
 # --- Local brain (Ollama) settings ---
-ollama_model: qwen2.5:7b-instruct   # any instruct model you have pulled
+ollama_model: qwen2.5:3b-instruct   # any instruct model you have pulled
 ollama_url: http://localhost:11434  # default Ollama daemon address
 
 # --- Gemini API brain settings ---

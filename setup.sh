@@ -95,12 +95,12 @@ echo ""
 echo "[6/8] Checking Ollama (the local conductor brain)..."
 if command -v ollama >/dev/null 2>&1; then
     echo "      Found: $(ollama --version)"
-    echo "      Pulling model qwen2.5:7b-instruct (one-time download)..."
-    ollama pull qwen2.5:7b-instruct
+    echo "      Pulling model qwen2.5:3b-instruct (one-time download)..."
+    ollama pull qwen2.5:3b-instruct
 else
     echo "      Ollama not found (this is not fatal)."
     echo "      Install it from:  https://ollama.com/download"
-    echo "      Then run:  ollama pull qwen2.5:7b-instruct"
+    echo "      Then run:  ollama pull qwen2.5:3b-instruct"
     echo "      (You can also use a free Google AI Studio key or the claude CLI"
     echo "       as the brain instead. See config.yaml.)"
 fi

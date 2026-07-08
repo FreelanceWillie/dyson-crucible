@@ -110,12 +110,12 @@ try {
 }
 
 if ($ollamaOk) {
-    Write-Host "      Pulling model qwen2.5:7b-instruct (one-time download)..."
-    ollama pull qwen2.5:7b-instruct
+    Write-Host "      Pulling model qwen2.5:3b-instruct (one-time download)..."
+    ollama pull qwen2.5:3b-instruct
 } else {
     Write-Host "      Ollama not found (this is not fatal)." -ForegroundColor DarkYellow
     Write-Host "      Install it from:  https://ollama.com/download" -ForegroundColor DarkYellow
-    Write-Host "      Then run:  ollama pull qwen2.5:7b-instruct" -ForegroundColor DarkYellow
+    Write-Host "      Then run:  ollama pull qwen2.5:3b-instruct" -ForegroundColor DarkYellow
     Write-Host "      (You can also use a free Google AI Studio key or the claude CLI"
     Write-Host "       as the brain instead. See config.yaml.)"
 }

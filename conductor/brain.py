@@ -130,7 +130,7 @@ OUTPUT:
 # ---------------------------------------------------------------------------
 _FALLBACK_CFG: Dict[str, Any] = {
     "brain": "local",
-    "ollama_model": "qwen2.5:7b-instruct",
+    "ollama_model": "qwen2.5:3b-instruct",
     "ollama_url": "http://localhost:11434",
     "gemini_api_key_env": "GEMINI_API_KEY",
     "gemini_model": "gemini-2.0-flash",
@@ -293,7 +293,7 @@ def _call_local(messages: List[Dict[str, str]], cfg: Dict[str, Any]) -> str:
     """Call a local Ollama server's /api/chat endpoint (stream off)."""
     requests = _requests()
     url = str(_cfg_get(cfg, "ollama_url", "http://localhost:11434")).rstrip("/")
-    model = str(_cfg_get(cfg, "ollama_model", "qwen2.5:7b-instruct"))
+    model = str(_cfg_get(cfg, "ollama_model", "qwen2.5:3b-instruct"))
     # keep_alive=0 unloads the model from VRAM right after the reply, so the brain
     # does not hold GPU memory that the image generator (ComfyUI) needs. On a 4GB
     # card the brain and the gen would otherwise fight over VRAM. They run
@@ -524,7 +524,7 @@ def available(cfg: Dict[str, Any]) -> Tuple[bool, str]:
 
     if which == "local":
         url = str(_cfg_get(cfg, "ollama_url", "http://localhost:11434")).rstrip("/")
-        model = str(_cfg_get(cfg, "ollama_model", "qwen2.5:7b-instruct"))
+        model = str(_cfg_get(cfg, "ollama_model", "qwen2.5:3b-instruct"))
         try:
             requests = _requests()
             resp = requests.get(url + "/api/tags", timeout=4)
