@@ -50,9 +50,17 @@ if (-not $pyOk) {
 # ---------------------------------------------------------------------
 Write-Host ""
 Write-Host "[2/8] Creating virtual environment (.venv)..." -ForegroundColor Yellow
-if (-not (Test-Path ".venv")) {
+$venvPy = ".\.venv\Scripts\python.exe"
+# Self-heal a partial/broken venv (folder exists but the interpreter is missing --
+# what happens if a first install was interrupted). Rebuild it cleanly.
+if ((Test-Path ".venv") -and -not (Test-Path $venvPy)) {
+    Write-Host "      .venv looks incomplete (interrupted install); rebuilding it..." -ForegroundColor Yellow
+    Remove-Item ".venv" -Recurse -Force -ErrorAction SilentlyContinue
+}
+if (-not (Test-Path $venvPy)) {
     python -m venv .venv
-    if ($?) { Write-Host "      Created .venv" }
+    if ($? -and (Test-Path $venvPy)) { Write-Host "      Created .venv" }
+    else { Write-Host "      Could not create .venv (is Python installed and on PATH?)" -ForegroundColor Red }
 } else {
     Write-Host "      .venv already exists, reusing it."
 }
