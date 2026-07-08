@@ -57,6 +57,63 @@ def _base(url: str) -> str:
 _LAST_LAUNCH = 0.0  # epoch of our last ComfyUI launch (avoid double-launching)
 
 
+def _port_from_url(url: str) -> int:
+    try:
+        from urllib.parse import urlparse
+        p = urlparse(_base(url)).port
+        return int(p or 8188)
+    except Exception:
+        return 8188
+
+
+def _pids_on_port(port: int) -> List[int]:
+    """PIDs holding a listening socket on `port` (best-effort, needs psutil)."""
+    try:
+        import psutil
+    except Exception:
+        return []
+    pids = set()
+    try:
+        for c in psutil.net_connections(kind="inet"):
+            if c.laddr and getattr(c.laddr, "port", None) == port and c.pid:
+                if c.status in (psutil.CONN_LISTEN, "LISTEN", "NONE"):
+                    pids.add(c.pid)
+    except Exception:
+        pass
+    return list(pids)
+
+
+def _reap_stale_comfyui(url: str, grace: int = 40) -> bool:
+    """If something holds the ComfyUI port but does not answer, give it a short
+    grace (it may be loading), then kill it so a single healthy instance can start.
+    Returns True if it killed a stale process."""
+    port = _port_from_url(url)
+    if not _pids_on_port(port):
+        return False
+    # grace: maybe it is a legit instance still loading
+    deadline = time.time() + grace
+    while time.time() < deadline:
+        if is_up(url):
+            return False
+        time.sleep(2)
+    # still unresponsive + holding the port -> stale. Kill it.
+    killed = False
+    try:
+        import psutil
+        for pid in _pids_on_port(port):
+            try:
+                p = psutil.Process(pid)
+                print(f"[comfyui] reaping unresponsive ComfyUI on port {port} (pid {pid})")
+                p.kill()
+                killed = True
+            except Exception:
+                pass
+        time.sleep(2)
+    except Exception:
+        pass
+    return killed
+
+
 def is_up(url: str) -> bool:
     """Return True if a ComfyUI server answers /system_stats with HTTP 200."""
     if requests is None:
@@ -93,6 +150,13 @@ def ensure_up(cfg: Dict[str, Any]) -> bool:
                 return True
             time.sleep(2)
         return False
+
+    # Reap a ZOMBIE ComfyUI: a crashed/stale process can still hold port 8188 but
+    # never answer /system_stats, which blocks a fresh healthy launch (and was
+    # exactly what the old buggy relaunch loop left behind). If the port is held but
+    # unresponsive after a short grace (it might just be loading), kill it so we can
+    # start one clean instance -- keeping a single healthy ComfyUI.
+    _reap_stale_comfyui(url)
 
     exe = (comfy.get("exe") or "").strip()
     if not exe:
