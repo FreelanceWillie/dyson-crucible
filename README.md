@@ -58,4 +58,4 @@ python conductor/server.py            # then open http://127.0.0.1:7860
 
 Windows + an NVIDIA GPU (works on 4GB with built-in low-VRAM handling; keep size at 512), about 15GB disk for models. Runs locally and free; a local tool you run, not a hosted site.
 
-Built on stdlib Python + framework-free ES modules, deliberately modular. To understand or extend it: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/EXTENDING.md](docs/EXTENDING.md).
+Built on stdlib Python + framework-free ES modules, deliberately modular. To understand or extend it: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/EXTENDING.md](docs/EXTENDING.md). Maintaining it: [docs/MAINTAINING.md](docs/MAINTAINING.md).
