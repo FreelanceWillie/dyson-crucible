@@ -34,7 +34,7 @@ You describe, rate, and pick. It runs entirely on your own Windows PC, no accoun
 1. Get the code: on the GitHub page click **Code → Download ZIP**, then unzip it (or `git clone https://github.com/FreelanceWillie/dyson-crucible`).
 2. **Double-click `Dyson Crucible.bat`.**
 
-That one file installs everything the first time (Python, Ollama + model, ComfyUI + models, config) and, every time after, just starts the app and opens it in your browser. It is safe to close and double-click again if a download stops. Then drop 8 to 20 of your style images into `references/default/`.
+That one file installs **everything** the first time, even the prerequisites: if Python or Git are missing it installs them for you (via winget or the official installer), then sets up the AI engine (ComfyUI), the local brain (Ollama), the models, and the config. Every time after, it just starts the app and opens it in your browser. It is safe to close and double-click again if a download stops. Then drop 8 to 20 of your style images into `references/default/`.
 
 <details><summary>Prefer the command line?</summary>
 
