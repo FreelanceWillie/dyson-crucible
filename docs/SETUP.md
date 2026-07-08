@@ -75,3 +75,23 @@ download failed during setup, this is where you will see it.
 - **Ollama was just installed but the model would not pull.** Ollama needs a
   fresh terminal after install. Close PowerShell, open a new one, and run
   `.\bootstrap.ps1` again (or just `ollama pull qwen2.5:7b-instruct`).
+
+## Transparent-background art
+
+Stable Diffusion 1.5 has no native alpha channel, so it cannot draw on true
+transparency by itself. Two ways to get transparent PNGs, from easy to advanced:
+
+1. **Recommended (built in, zero setup).** Generate normally, then cut the
+   background off. Either flip `gen.transparent: true` in `config.yaml` (every
+   candidate comes out pre-cut), or after picking a winner run the **`game_sprite`**
+   or **`pixel_sprite`** look-lab preset. Both use `rembg` to remove the
+   background and give you a clean RGBA PNG (the pixel one cuts *first*, then
+   pixelates, so there is no white halo on the edges). This works great and needs
+   nothing extra.
+
+2. **Advanced (native, optional).** For true transparent *generation* you can add
+   the [ComfyUI-LayerDiffuse](https://github.com/huchenlei/ComfyUI-layerdiffuse)
+   custom node plus its transparent model. It renders real alpha directly, but it
+   is an extra ~1.5GB download and uses more VRAM, which is tight on a 4GB card.
+   Only bother if the auto-cut in option 1 is not clean enough for a specific
+   asset. Most users never need this.

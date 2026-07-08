@@ -594,5 +594,28 @@ def generate(brief: Dict[str, Any], n: int, out_dir: str, cfg: Dict[str, Any]) -
     n = max(1, int(n))
 
     if engine == "diffusers":
-        return _generate_diffusers(brief, n, out_dir, cfg)
-    return _generate_comfyui(brief, n, out_dir, cfg)
+        results = _generate_diffusers(brief, n, out_dir, cfg)
+    else:
+        results = _generate_comfyui(brief, n, out_dir, cfg)
+
+    # Optional: transparent-background candidates by default. SD1.5 has no native
+    # alpha channel, so "transparent gen" = generate normally, then auto-cut the
+    # background off each candidate with rembg (the same bg_remove post step).
+    # Enable with gen.transparent: true (or per-brief brief['transparent']).
+    # Graceful: if rembg is missing or a cut fails, the original candidate stands.
+    gen_cfg = cfg.get("gen") or {}
+    want_transparent = bool(brief.get("transparent", gen_cfg.get("transparent", False)))
+    if want_transparent and results:
+        try:
+            try:
+                import postprocess as _pp
+            except ImportError:  # package layout
+                from conductor import postprocess as _pp  # type: ignore
+            for p in results:
+                try:
+                    _pp.step_bg_remove(p, {}, p)  # cut in place -> RGBA PNG
+                except Exception:
+                    pass  # keep the opaque original on any single failure
+        except Exception:
+            pass  # postprocess unavailable -> leave candidates opaque
+    return results

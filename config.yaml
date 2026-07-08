@@ -71,7 +71,10 @@ postprocess:
     game_sprite: [ {step: bg_remove}, {step: trim, params: {pad: 4}} ]  # transparent, tightly-cropped PNG ready to drop into a game
     hi_res: [ {step: upscale, params: {scale: 2}}, {step: trim} ]
     gameboy: [ {step: pixelate, params: {pixel_size: 5}}, {step: palette_map, params: {palette: gameboy}} ]
-    pixel_sprite: [ {step: pixelate, params: {pixel_size: 4, colors: 32}}, {step: bg_remove}, {step: trim} ]
+    # Cut the background FIRST, then pixelate. Order matters: pixelating a white
+    # background first bleeds white into every edge pixel (a fuzzy halo); the
+    # alpha-aware pixelate step only avoids that when it receives a cut-out.
+    pixel_sprite: [ {step: bg_remove}, {step: trim, params: {pad: 2}}, {step: pixelate, params: {pixel_size: 8, colors: 24}} ]
     comic: [ {step: toon, params: {colors: 8}}, {step: outline, params: {width: 4}} ]
     retro_crt: [ {step: scanlines}, {step: chromatic, params: {shift: 2}}, {step: grain, params: {amount: 8}} ]
 
@@ -83,6 +86,14 @@ gen:
   width: 512                        # 512 is the safe size for a 4GB GPU (SD1.5 native)
   height: 512
   ip_adapter: true                  # steer with reference images (IP-Adapter)
+  transparent: false                # transparent-background candidates by default.
+                                    # SD1.5 has NO native alpha channel, so this
+                                    # generates normally then auto-cuts the bg off
+                                    # each candidate with rembg. Set true for sprite
+                                    # work. (True native transparent gen needs the
+                                    # heavy LayerDiffuse node + model, not worth it
+                                    # on a 4GB card; see docs/SETUP.md.) Per-brief
+                                    # override: set transparent: true on the brief.
   n_candidates: 4                   # how many images to gen per run
   # --- LoRAs ---
   # LoRAs are per-asset, NOT global: set them on the brief as
