@@ -425,8 +425,12 @@ function galleryBlock() {
 }
 
 function doGen() {
+  const eng = (state.resources && state.resources.engine && state.resources.engine.state) || 'off';
   api.gen(state.current)
-    .then(() => toast('Generation queued'))
+    .then(() => {
+      if (eng === 'ready') { toast('Generating your images...', 'good'); }
+      else { toast('Queued. The engine is warming up — your batch starts automatically when it is ready (first run takes 1-2 min).', 'good'); }
+    })
     .catch((e) => toast('Could not generate: ' + e.message, 'bad'));
 }
 

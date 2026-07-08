@@ -158,7 +158,7 @@ def _remote_size(url: str) -> int:
     """HEAD-ish: return the server's Content-Length, or 0 if unknown."""
     try:
         req = urllib.request.Request(url, method="HEAD")
-        with urllib.request.urlopen(req) as r:
+        with urllib.request.urlopen(req, timeout=30) as r:
             return int(r.headers.get("Content-Length") or 0)
     except Exception:
         return 0
@@ -182,7 +182,7 @@ def _download(url: str, dest: str, log: Callable[[str], None]) -> bool:
         headers = {"Range": "bytes=%d-" % have} if have else {}
         try:
             req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req) as r, open(dest, "ab" if have else "wb") as f:
+            with urllib.request.urlopen(req, timeout=60) as r, open(dest, "ab" if have else "wb") as f:
                 # If the server ignored Range (200 not 206), restart from scratch.
                 if have and r.status == 200:
                     f.close(); open(dest, "wb").close()
@@ -213,7 +213,7 @@ def _git_clone(url: str, dest: str, log: Callable[[str], None]) -> bool:
     log("  cloning " + os.path.basename(dest) + " ...")
     try:
         subprocess.run(["git", "clone", "--depth", "1", url, dest],
-                       check=True, capture_output=True, text=True)
+                       check=True, capture_output=True, text=True, timeout=600)
         return True
     except Exception as e:
         log("  clone FAILED: " + str(e)); return False
@@ -243,7 +243,7 @@ def install(group_id: str, cfg: Optional[Dict[str, Any]] = None,
             if os.path.isfile(reqs):
                 try:
                     subprocess.run([_comfy_python(root), "-m", "pip", "install", "-r", reqs],
-                                   check=False, capture_output=True, text=True)
+                                   check=False, capture_output=True, text=True, timeout=1800)
                 except Exception:
                     pass
     # models
@@ -257,7 +257,7 @@ def install(group_id: str, cfg: Optional[Dict[str, Any]] = None,
             log("  pip install " + pkg + " ...")
             try:
                 subprocess.run([py, "-m", "pip", "install", pkg],
-                               check=False, capture_output=True, text=True)
+                               check=False, capture_output=True, text=True, timeout=1800)
             except Exception as e:
                 log("  pip FAILED " + pkg + ": " + str(e)); ok = False
     # patches (repo-relative script applied to a cloned node dir)
@@ -268,7 +268,7 @@ def install(group_id: str, cfg: Optional[Dict[str, Any]] = None,
             log("  patching " + node_name + " ...")
             try:
                 subprocess.run([sys.executable, script, node_dir],
-                               check=False, capture_output=True, text=True)
+                               check=False, capture_output=True, text=True, timeout=300)
             except Exception as e:
                 log("  patch FAILED: " + str(e)); ok = False
 

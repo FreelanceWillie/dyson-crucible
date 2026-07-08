@@ -321,9 +321,16 @@ async function renderDoctor() {
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
+let _lastEngine = null;
 export function mount() {
   const btn = document.getElementById('btnSettings');
   if (btn) { btn.onclick = openSettings; }
   on('open', (what) => { if (what === 'settings') { openSettings(); } });
   renderDoctor();
+  // Live-refresh the Doctor when the engine state changes (e.g. warming -> ready),
+  // so the "am I stuck?" banner reflects reality without opening Settings.
+  on('resources', (r) => {
+    const st = r && r.engine && r.engine.state;
+    if (st !== _lastEngine) { _lastEngine = st; renderDoctor(); }
+  });
 }

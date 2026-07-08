@@ -210,6 +210,9 @@ def ensure_up(cfg: Dict[str, Any]) -> bool:
             stderr=subprocess.STDOUT,
             close_fds=(os.name != "nt"),
         )
+        # Child has inherited its own handle to the log file; close ours so we do
+        # not leak a file handle on every self-heal launch.
+        logf.close()
         _LAST_LAUNCH = time.time()
     except Exception as exc:  # noqa: BLE001
         print(f"[comfyui] failed to launch ComfyUI: {exc}")

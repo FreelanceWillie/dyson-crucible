@@ -55,7 +55,7 @@ function renderQueue() {
     }
     // failed job -> a "why?" link that reveals the captured error
     let why = '';
-    if (j.status === 'failed' && j.error) { why = ` <a href="#" data-why="${j.id}" style="color:var(--bad)">why?</a>`; }
+    if (j.status === 'failed') { why = ` <a href="#" data-why="${j.id}" style="color:var(--bad)">why?</a>`; }
     return `<span class="pill ${j.status}" ${j.error ? `title="${esc(j.error).slice(0, 300)}"` : ''}>${lead}${esc(j.kind)}:${esc(j.asset)} ${esc(j.status)}${tries}${tail}${cancel}${why}</span>`;
   }).join(' ');
   strip.innerHTML = `<b>Queue</b> <span class="chip">${active.length} active</span> ${chips || '<span class="faint">idle</span>'} <button class="btn sm ghost" id="qdiag">Diagnostics</button> <button class="btn sm ghost" id="qclear">Clear finished</button>`;
@@ -63,7 +63,7 @@ function renderQueue() {
   strip.querySelectorAll('[data-why]').forEach((a) => a.onclick = (e) => {
     e.preventDefault();
     const j = (state.queue || []).find((x) => x.id === a.dataset.why);
-    if (j && j.error) { showError(j); }
+    if (j) { showError({ ...j, error: j.error || 'No error text was captured. Open Diagnostics (below) and send the full report.' }); }
   });
   const c = strip.querySelector('#qclear'); if (c) { c.onclick = () => api.qClear().then(() => toast('Cleared')); }
   const d = strip.querySelector('#qdiag'); if (d) { d.onclick = showDiagnostics; }
