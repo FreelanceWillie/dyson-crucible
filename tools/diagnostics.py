@@ -75,6 +75,20 @@ def static_report():
                         L.append("custom_nodes: " + (", ".join(nodes) or "(none)"))
                     except Exception:
                         pass
+                # model files present? (a missing checkpoint = gen fails even if
+                # ComfyUI is healthy). models dir sits next to main.py.
+                mroot = os.path.join(os.path.dirname(os.path.join(base, "ComfyUI", "main.py") if main1 else os.path.join(base, "main.py")), "models")
+                L.append("--- model files ---")
+                for sub, pat in (("checkpoints", ".safetensors"), ("ipadapter", ""), ("clip_vision", ""), ("controlnet", ""), ("loras", "")):
+                    d = os.path.join(mroot, sub)
+                    if os.path.isdir(d):
+                        try:
+                            files = [f for f in os.listdir(d) if not f.startswith(("put_", ".")) and (not pat or f.endswith(pat))]
+                            L.append("%s: %s" % (sub, (", ".join(files) if files else "(EMPTY)")))
+                        except Exception:
+                            pass
+                    else:
+                        L.append("%s: (dir missing)" % sub)
                 break
     if not found:
         L.append("ComfyUI NOT found (not installed).")
