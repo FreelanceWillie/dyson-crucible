@@ -97,6 +97,8 @@ function Have-Cmd($name) {
 # Prerequisite self-assembly (Python 3.10+, Git) lives in one shared file so the
 # update path (setup.ps1) uses the exact same logic. Ensure-Python / Ensure-Git.
 . (Join-Path $RepoRoot "tools\prereqs.ps1")
+# ComfyUI self-test + self-heal (Verify-Comfy).
+. (Join-Path $RepoRoot "tools\verify_comfyui.ps1")
 
 # Download helper: idempotent, prints size when done, never throws.
 function Get-File($url, $dest, $label) {
@@ -233,12 +235,9 @@ if ($comfyPresent) {
     $got = Get-File $ComfyUIPortableUrl $archive "ComfyUI portable archive"
 
     if ($got -and (Test-Path $archive)) {
-        # Need 7-Zip to unpack the .7z.
-        $sevenZip = $null
-        foreach ($p in @("C:/Program Files/7-Zip/7z.exe", "C:/Program Files (x86)/7-Zip/7z.exe")) {
-            if (Test-Path $p) { $sevenZip = $p; break }
-        }
-        if (-not $sevenZip -and (Have-Cmd "7z")) { $sevenZip = "7z" }
+        # Need 7-Zip to unpack the .7z -- auto-install it so the (self-contained,
+        # easy-to-launch) portable build is used instead of the fragile git clone.
+        $sevenZip = Ensure-SevenZip
 
         if ($sevenZip) {
             try {
@@ -476,9 +475,22 @@ Write-Host "  ComfyUI run with --lowvram (already wired). SDXL is not recommende
 Write-Host "  stick with SD1.5."
 Write-Host ""
 
-# Mark the install as complete so the launcher knows it does not need to run
-# bootstrap again. A checkpoint present is our proxy for "the heavy install ran".
+# =====================================================================
+#  Verify + self-heal the engine: prove ComfyUI actually launches.
+# =====================================================================
+Step 9 "Verifying the ComfyUI engine can start (self-test + heal)..."
+$configPath = Join-Path $RepoRoot "config.yaml"
+$comfyOk = $false
+try { $comfyOk = Verify-Comfy $ComfyUIRoot $RepoRoot $configPath } catch { Warn "verify step error: $_" }
+
+# Mark the install complete so the launcher does not re-run bootstrap. Requires a
+# checkpoint present AND ComfyUI verified -- otherwise the launcher will re-run the
+# installer (self-heal) next time instead of starting a half-working app.
 $ckptOk = (Test-Path (Join-Path $CkptDir "DreamShaper_8_pruned.safetensors")) -or (Test-Path $CkptFile)
-if ($ckptOk) {
+if ($ckptOk -and $comfyOk) {
     Set-Content -Path (Join-Path $RepoRoot ".dc_installed") -Value (Get-Date -Format "s") -Encoding ASCII
+    Ok "Install verified end to end."
+} else {
+    Warn "Install not fully verified (checkpoint=$ckptOk, comfyui=$comfyOk)."
+    Warn "Double-click the launcher again to let it finish/heal, or check the messages above."
 }

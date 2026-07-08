@@ -71,6 +71,27 @@ function Ensure-Python {
     return $null
 }
 
+# Return a path to 7z.exe, installing 7-Zip (winget) if needed. $null if unavailable.
+# 7-Zip is needed to unpack the self-contained ComfyUI portable build; without it
+# the installer falls back to a git clone that is much harder to launch.
+function Ensure-SevenZip {
+    foreach ($p in @("C:/Program Files/7-Zip/7z.exe", "C:/Program Files (x86)/7-Zip/7z.exe")) {
+        if (Test-Path $p) { return $p }
+    }
+    if (Get-Command 7z -ErrorAction SilentlyContinue) { return "7z" }
+    Write-Host "      7-Zip not found. Installing it (needed to unpack ComfyUI)..." -ForegroundColor Yellow
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        try { winget install --id 7zip.7zip -e --source winget --accept-package-agreements --accept-source-agreements --silent } catch {}
+        Refresh-Path
+    }
+    foreach ($p in @("C:/Program Files/7-Zip/7z.exe", "C:/Program Files (x86)/7-Zip/7z.exe")) {
+        if (Test-Path $p) { Write-Host "      7-Zip installed." -ForegroundColor Green; return $p }
+    }
+    if (Get-Command 7z -ErrorAction SilentlyContinue) { return "7z" }
+    Write-Host "      Could not auto-install 7-Zip." -ForegroundColor DarkYellow
+    return $null
+}
+
 # Ensure Git (needed for ComfyUI custom nodes / feature packs). Best-effort.
 function Ensure-Git {
     if (Get-Command git -ErrorAction SilentlyContinue) { return $true }
