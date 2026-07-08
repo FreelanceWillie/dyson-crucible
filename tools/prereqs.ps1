@@ -19,6 +19,16 @@ function Get-Python310 {
             $v = (& $cand[0] @($cand[1]) --version) 2>&1
             if ($LASTEXITCODE -eq 0 -and "$v" -match "Python (\d+)\.(\d+)") {
                 if ((([int]$Matches[1] -eq 3) -and ([int]$Matches[2] -ge 10)) -or ([int]$Matches[1] -gt 3)) {
+                    # Resolve the REAL python.exe path and return THAT (empty args), so
+                    # callers invoke the interpreter directly. The 'py' launcher can
+                    # misbehave right after a fresh install (e.g. drop into an
+                    # interactive REPL instead of running '-m venv'); a full path can't.
+                    try {
+                        $exe = (& $cand[0] @($cand[1]) -c "import sys; print(sys.executable)" 2>$null | Select-Object -First 1)
+                        if ($exe -and (Test-Path $exe)) {
+                            return @{ Exe = $exe; Args = @(); Version = "$v" }
+                        }
+                    } catch {}
                     return @{ Exe = $cand[0]; Args = $cand[1]; Version = "$v" }
                 }
             }
