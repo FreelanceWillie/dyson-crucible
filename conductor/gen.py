@@ -498,6 +498,16 @@ def _generate_comfyui(
                             raise RuntimeError("ComfyUI returned no images")
                         dest = os.path.join(out_dir, f"cand_{i}.png")
                         shutil.copyfile(images[0], dest)
+                        # Native output is a full-canvas RGBA; tight-crop the
+                        # transparent margins so sprites are ready to place.
+                        try:
+                            try:
+                                import postprocess as _pp
+                            except ImportError:
+                                from conductor import postprocess as _pp  # type: ignore
+                            _pp.step_trim(dest, {"pad": 2}, dest)
+                        except Exception:
+                            pass  # keep the untrimmed candidate on any failure
                         results.append(dest)
                         break
                     except Exception as exc:  # noqa: BLE001

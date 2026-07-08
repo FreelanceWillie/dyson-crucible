@@ -1243,6 +1243,27 @@ class Handler(BaseHTTPRequestHandler):
                 add("Python: " + mod, True, "installed (" + why + ")", "")
             except Exception:
                 add("Python: " + mod, False, "missing (" + why + ")", "Run setup.ps1 again.")
+        # LayerDiffuse (native transparent gen) readiness: node + models present.
+        try:
+            comfy_cfg = (conf.get("comfyui") or {}) if isinstance(conf, dict) else {}
+            root = comfy_cfg.get("root") or ""
+            candidates = []
+            if root:
+                candidates += [os.path.join(root, "custom_nodes", "ComfyUI-layerdiffuse"),
+                               os.path.join(root, "ComfyUI", "custom_nodes", "ComfyUI-layerdiffuse")]
+            node_dir = next((p for p in candidates if os.path.isdir(p)), None)
+            if node_dir:
+                # models auto-download on first use; presence is a bonus, not required.
+                add("Transparent gen (LayerDiffuse)", True, "node installed",
+                    "Set gen.transparent: native to generate true alpha. Models "
+                    "(~330MB) download automatically on first use.")
+            else:
+                add("Transparent gen (LayerDiffuse)", False, "node not found",
+                    "Optional. Run bootstrap.ps1 to install it, or use "
+                    "gen.transparent: cut (rembg) which needs no extra install.")
+        except Exception:
+            pass  # doctor must never crash on an optional probe
+
         # gpu + low-vram guidance
         gpu = resmod.snapshot().get("gpu")
         if gpu:

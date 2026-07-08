@@ -44,6 +44,10 @@ $LayerDiffuseGitUrl = "https://github.com/huchenlei/ComfyUI-layerdiffuse"
 # --- Model source URLs (HuggingFace direct download links) -----------
 # SD1.5 base checkpoint. Comfy-Org mirror (the original runwayml repo was removed from HF).
 $UrlCheckpoint = "https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive/resolve/main/v1-5-pruned-emaonly-fp16.safetensors"
+# DreamShaper 8: recommended default checkpoint (much better characters than base
+# SD1.5, same VRAM). Falls back to the vanilla checkpoint above if this fails.
+$UrlDreamShaper = "https://huggingface.co/Lykon/DreamShaper/resolve/main/DreamShaper_8_pruned.safetensors"
+$CheckpointName = "DreamShaper_8_pruned.safetensors"  # rewritten to vanilla if DS download fails
 # IP-Adapter models for SD1.5
 $UrlIpAdapter     = "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15.bin"
 $UrlIpAdapterPlus = "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-plus_sd15.bin"
@@ -60,6 +64,7 @@ $ClipVDir  = Join-Path $ComfyUIRoot "ComfyUI/models/clip_vision"
 $NodesDir  = Join-Path $ComfyUIRoot "ComfyUI/custom_nodes"
 
 $CkptFile        = Join-Path $CkptDir  "v1-5-pruned-emaonly.safetensors"
+$DreamShaperFile = Join-Path $CkptDir  "DreamShaper_8_pruned.safetensors"
 $IpFile          = Join-Path $IpDir    "ip-adapter_sd15.bin"
 $IpPlusFile      = Join-Path $IpDir    "ip-adapter-plus_sd15.bin"
 $ClipVisionFile  = Join-Path $ClipVDir "CLIP-ViT-H-14-image-encoder.safetensors"
@@ -321,8 +326,15 @@ if (Test-Path $ldNodeDir) {
 # =====================================================================
 #  [5/9] SD1.5 checkpoint
 # =====================================================================
-Step 5 "Downloading the SD1.5 checkpoint (~4 GB) into models/checkpoints..."
-Get-File $UrlCheckpoint $CkptFile "SD1.5 checkpoint (v1-5-pruned-emaonly)" | Out-Null
+Step 5 "Downloading the SD1.5 checkpoint (~2 GB) into models/checkpoints..."
+# Prefer DreamShaper 8 (better characters). Fall back to base SD1.5 if it fails,
+# and remember which one we got so Step 9 can point config.yaml at it.
+$dsOk = Get-File $UrlDreamShaper $DreamShaperFile "DreamShaper 8 (recommended SD1.5 checkpoint)"
+if (-not $dsOk) {
+    Warn "DreamShaper download failed; falling back to base SD1.5."
+    Get-File $UrlCheckpoint $CkptFile "SD1.5 checkpoint (v1-5-pruned-emaonly)" | Out-Null
+    $CheckpointName = "v1-5-pruned-emaonly.safetensors"
+}
 
 # =====================================================================
 #  [6/9] IP-Adapter model (base)
@@ -382,6 +394,10 @@ if (Test-Path $configPath) {
             elseif ($line -match '^(\s*)root:\s*".*"') {
                 $indent = $matches[1]
                 $out.Add("$indent" + 'root: "' + $rootForYaml + '"          # set by bootstrap.ps1')
+            }
+            elseif ($line -match '^(\s*)checkpoint:\s*\S') {
+                $indent = $matches[1]
+                $out.Add("$indent" + 'checkpoint: ' + $CheckpointName + '  # set by bootstrap.ps1 (downloaded checkpoint)')
             }
             else {
                 $out.Add($line)

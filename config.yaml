@@ -46,7 +46,11 @@ comfyui:
   workflow: workflows/sd15_ipadapter.json       # single-reference template (API format)
   workflow_multi: workflows/sd15_multi_ipadapter.json  # multi-image (style + subject) template
   workflow_layerdiffuse: workflows/sd15_layerdiffuse.json  # native transparent gen (gen.transparent: native)
-  checkpoint: v1-5-pruned-emaonly.safetensors  # SD1.5 checkpoint filename in ComfyUI/models/checkpoints
+  checkpoint: DreamShaper_8_pruned.safetensors  # SD1.5 checkpoint in ComfyUI/models/checkpoints.
+                                    # DreamShaper 8 is a big quality upgrade over base
+                                    # SD1.5 for characters at the same VRAM. bootstrap.ps1
+                                    # fetches it (and falls back to v1-5-pruned-emaonly if
+                                    # that download fails, rewriting this line to match).
   ip_adapter_preset: PLUS           # IP-Adapter preset node value
 
 # --- Model Manager (models.py): search + install LoRAs/ControlNets from Civitai ---
