@@ -12,7 +12,7 @@ if (prefs.motion === 'reduce') { document.documentElement.setAttribute('data-mot
 // The feature modules. Order is not important; each is independent.
 const MODULES = [
   'home', 'rail', 'asset', 'chat', 'queue',
-  'explore', 'taste', 'postprocess', 'models', 'webref', 'settings', 'chrome', 'animate',
+  'explore', 'taste', 'postprocess', 'models', 'webref', 'checkpoints', 'settings', 'chrome', 'animate',
 ];
 
 (async function boot() {

@@ -79,6 +79,10 @@ export const api = {
   // optional feature-group installers (unlock on demand)
   capabilities: () => GET('/api/capabilities'),
   installCapability: (group) => POST('/api/capabilities/install', { group }),
+  // checkpoints (the "art style engine": curated base models)
+  checkpoints: () => GET('/api/checkpoints'),
+  checkpointInstall: (id, select) => POST('/api/checkpoints/install', { id, select }),
+  checkpointSelect: (filename) => POST('/api/checkpoints/select', { filename }),
   // animation
   version: () => GET('/api/version'),
   update: () => POST('/api/update'),

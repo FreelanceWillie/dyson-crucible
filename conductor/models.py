@@ -165,10 +165,13 @@ def models_root(cfg: Dict[str, Any]) -> str:
     return ""
 
 
-def dest_dir(kind: str, cfg: Dict[str, Any]) -> str:
-    """Return the install directory for ``kind`` ('lora' or 'controlnet').
+_KIND_SUBDIR = {"lora": "loras", "controlnet": "controlnet", "checkpoint": "checkpoints"}
 
-    Maps to ``<models_root>/loras`` or ``<models_root>/controlnet``. Creates the
+
+def dest_dir(kind: str, cfg: Dict[str, Any]) -> str:
+    """Return the install directory for ``kind`` ('lora', 'controlnet', 'checkpoint').
+
+    Maps to ``<models_root>/{loras,controlnet,checkpoints}``. Creates the
     directory if the models root is known but the subfolder is missing. Returns
     "" if the models root couldn't be resolved.
     """
@@ -176,7 +179,7 @@ def dest_dir(kind: str, cfg: Dict[str, Any]) -> str:
     if not root:
         return ""
 
-    sub = "loras" if _norm_kind(kind) == "lora" else "controlnet"
+    sub = _KIND_SUBDIR.get(_norm_kind(kind), "loras")
     target = os.path.join(root, sub)
     try:
         os.makedirs(target, exist_ok=True)
@@ -186,16 +189,19 @@ def dest_dir(kind: str, cfg: Dict[str, Any]) -> str:
 
 
 def _norm_kind(kind: Optional[str]) -> str:
-    """Normalise a kind string to 'lora' or 'controlnet' (default 'lora')."""
+    """Normalise a kind string to 'lora', 'controlnet', or 'checkpoint' (default 'lora')."""
     k = (kind or "lora").strip().lower()
     if k in ("controlnet", "control_net", "control-net", "cn"):
         return "controlnet"
+    if k in ("checkpoint", "ckpt", "model", "base", "base_model"):
+        return "checkpoint"
     return "lora"
 
 
 def _civitai_type(kind: str) -> str:
     """Civitai `types` query value for our kind."""
-    return "Controlnet" if _norm_kind(kind) == "controlnet" else "LORA"
+    nk = _norm_kind(kind)
+    return {"controlnet": "Controlnet", "checkpoint": "Checkpoint"}.get(nk, "LORA")
 
 
 # ---------------------------------------------------------------------------
@@ -377,6 +383,7 @@ def list_installed(cfg: Optional[Dict[str, Any]] = None) -> Dict[str, List[str]]
     return {
         "loras": _list_dir(dest_dir("lora", cfg)),
         "controlnets": _list_dir(dest_dir("controlnet", cfg)),
+        "checkpoints": _list_dir(dest_dir("checkpoint", cfg)),
     }
 
 

@@ -30,7 +30,8 @@ from urllib.parse import urlparse, parse_qs, unquote
 try:
     from conductor import (cfg, brief as briefmod, brain, jobs, categories as catmod,
                            resources as resmod, models as modelsmod, webref as webrefmod,
-                           postprocess as ppmod, taste as tastemod, capabilities as capmod)
+                           postprocess as ppmod, taste as tastemod, capabilities as capmod,
+                           checkpoints as ckptmod)
 except Exception:  # pragma: no cover - fallback for loose-script execution
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import cfg  # type: ignore
@@ -44,6 +45,7 @@ except Exception:  # pragma: no cover - fallback for loose-script execution
     import postprocess as ppmod  # type: ignore
     import taste as tastemod  # type: ignore
     import capabilities as capmod  # type: ignore
+    import checkpoints as ckptmod  # type: ignore
 
 
 import subprocess as _subprocess
@@ -140,6 +142,53 @@ def _cap_install_bg(group_id, conf):
     with _CAP_LOCK:
         _CAP_PROGRESS[group_id]["done"] = True
         _CAP_PROGRESS[group_id]["ok"] = ok
+
+
+# Background checkpoint downloads: {id: {"pct": float, "done": bool, "ok": bool, "error": str}}
+_CKPT_PROGRESS = {}
+_CKPT_LOCK = threading.Lock()
+
+
+def _ckpt_install_bg(cid, conf, select_after):
+    with _CKPT_LOCK:
+        _CKPT_PROGRESS[cid] = {"pct": 0.0, "done": False, "ok": False, "error": ""}
+
+    def on_pct(pct):
+        with _CKPT_LOCK:
+            _CKPT_PROGRESS[cid]["pct"] = round(float(pct), 1)
+
+    ok, err = False, ""
+    try:
+        ckptmod.install(cid, conf, on_pct)
+        ok = True
+    except Exception as exc:  # noqa: BLE001
+        err = str(exc)
+    with _CKPT_LOCK:
+        _CKPT_PROGRESS[cid].update({"pct": 100.0 if ok else _CKPT_PROGRESS[cid]["pct"],
+                                    "done": True, "ok": ok, "error": err})
+    # On success, optionally make it the active checkpoint (config write is atomic).
+    if ok and select_after:
+        entry = ckptmod.by_id(cid)
+        if entry:
+            try:
+                _write_checkpoint(entry["filename"])
+            except Exception as exc:  # noqa: BLE001
+                with _CKPT_LOCK:
+                    _CKPT_PROGRESS[cid]["error"] = "installed, but could not select: " + str(exc)
+
+
+def _write_checkpoint(filename):
+    """Set comfyui.checkpoint in config.yaml atomically and reload the cache."""
+    import yaml
+    cfg_path = cfg.resolve("config.yaml")
+    with open(cfg_path, "r", encoding="utf-8") as fh:
+        doc = yaml.safe_load(fh) or {}
+    doc.setdefault("comfyui", {})["checkpoint"] = filename
+    tmp = cfg_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        yaml.safe_dump(doc, fh, sort_keys=False, allow_unicode=True)
+    os.replace(tmp, cfg_path)
+    cfg.load_config(force_reload=True)
 
 
 REPO_ROOT = cfg.REPO_ROOT
@@ -503,6 +552,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(exc)}, 500)
             return
 
+        if path == "/api/checkpoints":
+            try:
+                st = ckptmod.status(conf)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500); return
+            with _CKPT_LOCK:
+                st["progress"] = {k: dict(v) for k, v in _CKPT_PROGRESS.items()}
+            self._send_json(st)
+            return
+
         if path == "/api/postprocess/steps":
             try:
                 self._send_json({"steps": ppmod.available_steps()})
@@ -639,6 +698,33 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"ok": True, "already": True}); return
             threading.Thread(target=_cap_install_bg, args=(group, conf), daemon=True).start()
             self._send_json({"ok": True, "started": group})
+            return
+
+        if path == "/api/checkpoints/install":
+            cid = (data.get("id") or "").strip()
+            if not ckptmod.by_id(cid):
+                self._send_json({"error": "unknown checkpoint id: " + cid}, 400); return
+            with _CKPT_LOCK:
+                running = cid in _CKPT_PROGRESS and not _CKPT_PROGRESS[cid].get("done", True)
+            if running:
+                self._send_json({"ok": True, "already": True}); return
+            select_after = data.get("select", True)  # download then make active by default
+            threading.Thread(target=_ckpt_install_bg, args=(cid, conf, bool(select_after)),
+                             daemon=True).start()
+            self._send_json({"ok": True, "started": cid})
+            return
+
+        if path == "/api/checkpoints/select":
+            fn = (data.get("filename") or "").strip()
+            if not fn:
+                self._send_json({"error": "filename required"}, 400); return
+            if fn not in ckptmod.installed(conf):
+                self._send_json({"error": "not installed: " + fn}, 400); return
+            try:
+                _write_checkpoint(fn)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500); return
+            self._send_json({"ok": True, "active": fn})
             return
 
         if path == "/api/new":

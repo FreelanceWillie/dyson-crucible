@@ -118,6 +118,12 @@ async function renderSettings() {
       <div class="faint">Some settings apply to the next generation, not the current one.</div>
       <div class="row"><button class="btn primary" id="setSave">Save settings</button></div>
 
+      <div class="h">Art style engine</div>
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div class="col" style="gap:2px"><span class="faint">The model that draws. Pick one that fits your subject (toon, realistic, fantasy...).</span></div>
+        <button class="btn sm" id="btnCheckpoints">Choose model</button>
+      </div>
+
       <div class="h">This computer</div>
       <div class="col" style="gap:12px">
         <div class="col" style="gap:4px">
@@ -166,6 +172,7 @@ async function renderSettings() {
   notify.onchange = () => { const p = loadPrefs(); p.notifyDone = notify.checked; savePrefs(p); };
 
   box.querySelector('#setTutorial').onclick = () => { close(); emit('open', 'tutorial'); };
+  box.querySelector('#btnCheckpoints').onclick = () => { emit('open', 'checkpoints'); };
 
   renderFeaturePacks(box);
   renderVersion(box);

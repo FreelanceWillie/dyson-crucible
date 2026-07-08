@@ -78,6 +78,7 @@ const ACTIONS = [
   { name: 'Animate', hint: 'Pose frames or an idle loop', run: () => setView('animate') },
   { name: 'Generate', hint: 'Make a batch for the current hero', run: doGen },
   { name: 'Post-process', hint: 'Clean up and finish', run: () => emit('open', 'postprocess') },
+  { name: 'Art style engine', hint: 'Pick the model that draws (toon, realistic, fantasy...)', run: () => emit('open', 'checkpoints') },
   { name: 'Model Manager', hint: 'Install or pick models', run: () => emit('open', 'models') },
   { name: 'Web reference', hint: 'Pull reference images from the web', run: () => emit('open', 'webref') },
   { name: 'Settings', hint: 'Quality, theme, and more', run: clickSettings },
