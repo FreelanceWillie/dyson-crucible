@@ -18,30 +18,32 @@ Write-Host ""
 # 1. Python 3.10+
 # ---------------------------------------------------------------------
 Write-Host "[1/8] Checking Python..." -ForegroundColor Yellow
-$pyOk = $false
-try {
-    $pyVer = (python --version)
-    if ($?) {
-        Write-Host "      Found: $pyVer"
-        $m = [regex]::Match($pyVer, "(\d+)\.(\d+)")
-        if ($m.Success) {
-            $maj = [int]$m.Groups[1].Value
-            $min = [int]$m.Groups[2].Value
-            if ($maj -eq 3 -and $min -ge 10) { $pyOk = $true }
-            elseif ($maj -gt 3) { $pyOk = $true }
+# Find a REAL Python 3.10+. Try the Windows launcher (py) FIRST -- bare 'python' on
+# many Windows machines is the Microsoft Store stub that just prints "Python was not
+# found". Store each candidate as exe + prefix args (e.g. 'py' '-3').
+$PyExe = $null; $PyArgs = @()
+foreach ($cand in @(@("py", @("-3")), @("python", @()), @("python3", @()))) {
+    $exe = $cand[0]; $pre = $cand[1]
+    try {
+        $v = (& $exe @pre --version) 2>&1
+        if ($LASTEXITCODE -eq 0 -and "$v" -match "Python (\d+)\.(\d+)") {
+            $maj = [int]$Matches[1]; $min = [int]$Matches[2]
+            if (($maj -eq 3 -and $min -ge 10) -or ($maj -gt 3)) {
+                $PyExe = $exe; $PyArgs = $pre
+                Write-Host "      Found: $v  (using '$exe $($pre -join ' ')')"
+                break
+            }
         }
-    }
-} catch {
-    $pyOk = $false
+    } catch {}
 }
 
-if (-not $pyOk) {
+if (-not $PyExe) {
     Write-Host ""
     Write-Host "  Python 3.10 or newer is required and was not found." -ForegroundColor Red
     Write-Host "  Install it from:  https://www.python.org/downloads/" -ForegroundColor Red
     Write-Host "  (Tick 'Add python.exe to PATH' in the installer.)" -ForegroundColor Red
+    Write-Host "  If Python IS installed and 'py --version' works, just re-run this." -ForegroundColor Red
     Write-Host ""
-    Write-Host "  Stopping here. Re-run setup.ps1 once Python is installed." -ForegroundColor Red
     exit 1
 }
 
@@ -58,18 +60,20 @@ if ((Test-Path ".venv") -and -not (Test-Path $venvPy)) {
     Remove-Item ".venv" -Recurse -Force -ErrorAction SilentlyContinue
 }
 if (-not (Test-Path $venvPy)) {
-    python -m venv .venv
+    & $PyExe @PyArgs -m venv .venv
     if ($? -and (Test-Path $venvPy)) { Write-Host "      Created .venv" }
-    else { Write-Host "      Could not create .venv (is Python installed and on PATH?)" -ForegroundColor Red }
+    else {
+        Write-Host "      Could not create .venv. Try:  $PyExe $($PyArgs -join ' ') -m venv .venv" -ForegroundColor Red
+        exit 1
+    }
 } else {
     Write-Host "      .venv already exists, reusing it."
 }
 
-Write-Host "      Activating .venv..."
-& ".\.venv\Scripts\Activate.ps1"
-if ($?) { Write-Host "      Activated." }
-
-python -m pip install --upgrade pip
+# Use the venv's python DIRECTLY for every install below. Do NOT rely on
+# Activate.ps1 (the call operator does not persist activation into this scope,
+# and bare 'python'/'pip' can resolve to the Microsoft Store stub).
+& $venvPy -m pip install --upgrade pip
 
 # ---------------------------------------------------------------------
 # 3. torch + torchvision (CUDA 12.1 build)
@@ -78,14 +82,14 @@ Write-Host ""
 Write-Host "[3/8] Installing torch + torchvision (CUDA 12.1)..." -ForegroundColor Yellow
 Write-Host "      This download is large. Go make a coffee."
 # CPU-only users: drop the --index-url line below. It will run, just slowly.
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+& $venvPy -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 # ---------------------------------------------------------------------
 # 4. Python dependencies
 # ---------------------------------------------------------------------
 Write-Host ""
 Write-Host "[4/8] Installing Python dependencies..." -ForegroundColor Yellow
-pip install -r requirements.txt
+& $venvPy -m pip install -r requirements.txt
 
 # ---------------------------------------------------------------------
 # 5. GPU check
@@ -154,7 +158,7 @@ Write-Host ""
 Write-Host " To start making art:" -ForegroundColor Green
 Write-Host ""
 Write-Host "   1. Put 8 to 20 style images in  references\default\"
-Write-Host "   2. Start ComfyUI, and in another terminal run:  ollama serve"
-Write-Host "   3. Run:  python conductor\server.py"
-Write-Host "      Then open:  http://127.0.0.1:7860"
+Write-Host "   2. Double-click  'Dyson Crucible.bat'  to start the app."
+Write-Host "      (It opens in your browser at http://127.0.0.1:7860 .)"
+Write-Host "      CLI alternative:  .venv\Scripts\python.exe conductor\server.py"
 Write-Host ""

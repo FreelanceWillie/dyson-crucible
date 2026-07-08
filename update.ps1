@@ -64,10 +64,13 @@ foreach ($cr in $ComfyRoots) {
                 & git -C $d.FullName pull --ff-only 2>$null | Out-Null
             }
         }
-        # a node we patch must be re-patched after its own pull
+        # a node we patch must be re-patched after its own pull. Use the repo .venv
+        # python (avoid bare 'python' = Microsoft Store stub on many machines).
         $ld = Join-Path $nodes "ComfyUI-layerdiffuse"
-        if ((Test-Path $ld) -and (Test-Path $patch)) { & python $patch $ld 2>$null | Out-Null }
+        $repoVenvPy = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+        $py2 = if (Test-Path $repoVenvPy) { $repoVenvPy } else { $null }
+        if ($py2 -and (Test-Path $ld) -and (Test-Path $patch)) { & $py2 $patch $ld 2>$null | Out-Null }
     }
 }
 
-Ok "Update complete. Restart the app:  python conductor/server.py"
+Ok "Update complete. Start the app by double-clicking 'Dyson Crucible.bat'."

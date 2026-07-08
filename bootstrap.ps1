@@ -314,13 +314,16 @@ if (Test-Path $ldNodeDir) {
         # Idempotent: safe to re-run. Uses whatever python is on PATH (pure file edits).
         $patchPy = Join-Path $RepoRoot "tools/patch_layerdiffuse.py"
         if (Test-Path $patchPy) {
-            $pyExe = if (Test-Path $embPy) { $embPy } elseif (Have-Cmd "python") { "python" } else { $null }
+            # Prefer the repo .venv python, then ComfyUI's embedded python. Avoid
+            # bare 'python' (Microsoft Store stub on many machines).
+            $repoVenvPy = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+            $pyExe = if (Test-Path $repoVenvPy) { $repoVenvPy } elseif (Test-Path $embPy) { $embPy } else { $null }
             if ($pyExe) {
                 & $pyExe $patchPy $ldNodeDir
                 if ($?) { Ok "LayerDiffuse installed + patched (set gen.transparent: native to use it)." }
             } else {
                 Warn "No python found to apply the LayerDiffuse patch."
-                Manual "Run:  python tools/patch_layerdiffuse.py `"$ldNodeDir`""
+                Manual "Run:  .venv\Scripts\python.exe tools/patch_layerdiffuse.py `"$ldNodeDir`""
             }
         }
     } catch {
@@ -442,12 +445,10 @@ Write-Host ""
 Write-Host "  3 things to do to start making art:" -ForegroundColor Green
 Write-Host ""
 Write-Host "    1. Drop 8 to 20 style images into:  references\default\"
-Write-Host "    2. Start everything (in this repo folder):"
-Write-Host "         .\.venv\Scripts\Activate.ps1"
-Write-Host "         python conductor\server.py"
-Write-Host "       (This starts the conductor; it can auto-launch ComfyUI for you"
-Write-Host "        using the launcher we just wired, with --lowvram for your 4GB card.)"
-Write-Host "    3. Open in your browser:  http://127.0.0.1:7860"
+Write-Host "    2. Double-click  'Dyson Crucible.bat'  to start the app."
+Write-Host "       (It auto-launches ComfyUI with --lowvram and opens your browser.)"
+Write-Host "       CLI alternative:  .venv\Scripts\python.exe conductor\server.py"
+Write-Host "    3. Open in your browser (if it does not open itself):  http://127.0.0.1:7860"
 Write-Host ""
 Write-Host "  The health panel (the Doctor) on that page shows anything still"
 Write-Host "  missing (a model, Ollama, ComfyUI) and how to fix it. If a download"
