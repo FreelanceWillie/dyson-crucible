@@ -54,8 +54,25 @@ def _gpu() -> Optional[Dict[str, Any]]:
         return None
 
 
+_SNAP_CACHE = {"t": 0.0, "data": None}
+_SNAP_TTL = 2.5  # seconds; multiple pollers/tabs reuse one reading
+
+
 def snapshot() -> Dict[str, Any]:
-    """One reading of the machine's resource state (safe to call every ~2s)."""
+    """One reading of the machine's resource state, cached ~2.5s. The GPU reading
+    spawns nvidia-smi, so without this cache every 2s poll (x every open tab) would
+    fork a process -- soaking the CPU the tool is meant to leave for generation."""
+    import time as _t
+    now = _t.time()
+    if _SNAP_CACHE["data"] is not None and (now - _SNAP_CACHE["t"]) < _SNAP_TTL:
+        return _SNAP_CACHE["data"]
+    data = _snapshot_raw()
+    _SNAP_CACHE["t"] = now
+    _SNAP_CACHE["data"] = data
+    return data
+
+
+def _snapshot_raw() -> Dict[str, Any]:
     ps = _psutil()
     data: Dict[str, Any] = {"gpu": _gpu()}
     if ps is not None:

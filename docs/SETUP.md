@@ -60,8 +60,21 @@ download failed during setup, this is where you will see it.
   [https://ollama.com/download](https://ollama.com/download), then re-run
   `.\bootstrap.ps1`. It will pull the brain model for you.
 
+- **Something is wrong and you don't know what.** Two built-in tools:
+  1. In the app, bottom bar: click **Diagnostics** -> **Copy all**. That block has
+     your config, whether ComfyUI is running, the exact error of any failed job, and
+     ComfyUI's own crash log. A failed job also gets a red **why?** link showing its
+     error. Send the copied block to whoever is helping you.
+  2. If the app won't even open, double-click **Diagnostics.bat** in the project
+     folder -- it writes `diagnostics.txt` with the same essentials.
+
+- **Generation shows a progress ring + "~Ns left".** After the first successful gen
+  the tool learns how long a run takes and shows a filling ring with a countdown.
+  The very first run has no estimate yet, so it shows a spinner until it learns.
+
 - **ComfyUI is very slow the first time.** That is normal. The first generation
-  loads the model into memory. Later runs are much faster.
+  loads the model into memory. Later runs are much faster. On a 4GB card the cold
+  load can take a minute or two before the first image appears.
 
 - **"Out of memory" / VRAM error.** Your card has 4GB. Keep the image size at
   512 (the default) and make sure ComfyUI is running in low-memory mode

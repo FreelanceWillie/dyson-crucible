@@ -1664,10 +1664,37 @@ def _start_worker():
     return stop_flag, t
 
 
+def _startup_selfcheck():
+    """Print a one-glance health summary at boot so problems are obvious in the
+    console immediately -- not only after the first failed generation."""
+    try:
+        conf = cfg.load_config()
+        comfy = (conf.get("comfyui") or {})
+        print("[selfcheck] checkpoint: %s" % comfy.get("checkpoint"))
+        exe = (comfy.get("exe") or "").strip()
+        print("[selfcheck] comfyui launcher: %s" % (exe or "(unset - gen cannot auto-start ComfyUI)"))
+        try:
+            import comfyui as _cf
+            up = _cf.is_up(comfy.get("url", "http://127.0.0.1:8188"))
+            print("[selfcheck] ComfyUI reachable now: %s" % up)
+        except Exception:
+            pass
+        for mod in ("yaml", "PIL", "requests"):
+            try:
+                __import__(mod)
+            except Exception:
+                print("[selfcheck] MISSING python dep: %s (re-run the installer)" % mod)
+        print("[selfcheck] If generation fails, click 'Diagnostics' in the app "
+              "(bottom bar) and send the copied block.")
+    except Exception as exc:
+        print("[selfcheck] skipped: %s" % exc)
+
+
 def serve(port=None):
     if port is None:
         port = int(os.environ.get("CONDUCTOR_PORT", "7860"))
     _start_worker()
+    _startup_selfcheck()
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     url = "http://127.0.0.1:{0}/".format(port)
     print("Dyson Crucible dashboard running at " + url)

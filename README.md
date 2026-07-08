@@ -23,7 +23,8 @@ You describe, rate, and pick. It runs entirely on your own Windows PC, no accoun
 - **Categories** that pass a shared look down to every hero inside them.
 - **Multi-image blend** (style from these, character from that, plus a prompt) and **LoRA/ControlNet** download from Civitai.
 - **A 26-step look lab** with live previews: transparent sprite, upscale, dither, pixel-art, palette-map (GameBoy/PICO-8/NES), toon, duotone, halftone, scanlines, grain, glow, normal-map for 2.5D lighting, vectorize, and more. Chain them or use one-click presets. Vectorize is optional, never forced.
-- **Your machine stays yours.** Self-healing queue (retries, relaunches ComfyUI, recovers after a crash), a **Reclaim machine** kill switch (pause + stop + free the GPU), and a live CPU/RAM/GPU/VRAM readout.
+- **Your machine stays yours.** Self-healing queue (retries, relaunches ComfyUI, recovers after a crash), a **Reclaim machine** kill switch (pause + stop + free the GPU), and a live CPU/RAM/GPU/VRAM readout. Polling is adaptive and pauses when the tab is hidden, and the GPU reading is cached, so the dashboard barely touches the CPU while it is idle, leaving the compute for generation.
+- **Progress + diagnostics.** Running jobs show a fill ring with a live ETA. Anything that fails surfaces the real error (a **why?** link) and a one-click **Diagnostics** report (config, ComfyUI status, the error, and ComfyUI's crash log) you can copy in one block, plus a `Diagnostics.bat` for when the app itself will not open.
 - **A friendly Doctor** that checks your setup on load and, with one-click Start buttons, tells you exactly what is missing. Plus a command palette (Ctrl+K), hotkeys, a tutorial, and light/dark themes.
 
 ---

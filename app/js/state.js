@@ -64,16 +64,22 @@ export async function refreshResources() {
   catch (_) { /* keep last */ }
 }
 
-// start the poll loops; pause when the tab is hidden to save the machine
+// start the poll loops. ADAPTIVE + hidden-tab-paused so we barely touch the CPU
+// when nothing is happening (the machine's compute should go to generation):
+//  - poll fast (2s) only while a job is active; slow (6s) when idle.
+//  - skip entirely while the tab is hidden.
 let timers = [];
 export function startPolling() {
-  const tick = (fn, ms) => {
-    const run = () => { if (!document.hidden) { fn(); } };
+  const busy = () => (state.queue || []).some((j) => j.status === 'running' || j.status === 'queued');
+  const loop = (fn) => {
+    const run = async () => {
+      if (!document.hidden) { try { await fn(); } catch (_) {} }
+      timers.push(setTimeout(run, busy() ? 2000 : 6000));
+    };
     run();
-    timers.push(setInterval(run, ms));
   };
-  tick(refreshQueue, 2000);
-  tick(refreshResources, 2000);
+  loop(refreshQueue);
+  loop(refreshResources);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { refreshQueue(); refreshResources(); } });
 }
 export function stopPolling() { timers.forEach(clearInterval); timers = []; }
