@@ -418,7 +418,13 @@ def _build_workflow(
     ks["steps"] = int(gen.get("steps", 28))
     ks["cfg"] = float(gen.get("cfg", 7.0))
 
-    weight = float(brief.get("ip_adapter_weight", 0.0) or 0.0)
+    # Effective follow-strength: the brief's own weight wins; otherwise fall back
+    # to the global default (gen.ip_adapter_weight). The gen.ip_adapter master
+    # toggle can switch reference steering off entirely.
+    _bw = brief.get("ip_adapter_weight")
+    weight = float(_bw if _bw is not None else gen.get("ip_adapter_weight", 0.6))
+    if not bool(gen.get("ip_adapter", True)):
+        weight = 0.0
     use_ip = (
         weight > 0
         and ref_filename is not None
@@ -570,8 +576,13 @@ def _generate_comfyui(
 
     if not use_multi:
         template = _load_workflow_template(cfg)
-        # Resolve + upload the reference once (shared across candidates).
-        weight = float(brief.get("ip_adapter_weight", 0.0) or 0.0)
+        # Resolve + upload the reference once (shared across candidates). Mirror the
+        # builder's effective-weight logic so we only upload when IP will run.
+        _gcfg = cfg.get("gen", {}) or {}
+        _bw = brief.get("ip_adapter_weight")
+        weight = float(_bw if _bw is not None else _gcfg.get("ip_adapter_weight", 0.6))
+        if not bool(_gcfg.get("ip_adapter", True)):
+            weight = 0.0
         if weight > 0:
             refs = _find_references(brief.get("reference_set", "default"))
             if refs:

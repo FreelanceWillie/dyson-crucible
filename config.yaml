@@ -90,7 +90,10 @@ gen:
   cfg: 7.0                          # classifier-free guidance scale
   width: 512                        # 512 is the safe size for a 4GB GPU (SD1.5 native)
   height: 512
-  ip_adapter: true                  # steer with reference images (IP-Adapter)
+  ip_adapter: true                  # steer with reference images (IP-Adapter). false = ignore refs.
+  ip_adapter_weight: 0.6            # default follow-strength for NEW heroes, 0..1. Higher hugs your
+                                    # reference images harder but can override your prompt (muddy,
+                                    # off-prompt). ~0.5-0.7 is the sweet spot. Per-hero override wins.
   transparent: false                # transparent-background candidates. Values:
                                     #   false  = off (opaque candidates)
                                     #   cut    = generate normally, then auto-cut the

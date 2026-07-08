@@ -203,7 +203,7 @@ def _build_messages(brief: Dict[str, Any], feedback: str) -> List[Dict[str, str]
     ).format(
         prompt=brief.get("prompt", ""),
         negative=brief.get("negative", ""),
-        weight=brief.get("ip_adapter_weight", 0.8),
+        weight=brief.get("ip_adapter_weight", 0.6),
         refset=brief.get("reference_set", "default"),
     )
     user_block = (
@@ -423,7 +423,7 @@ def _snapshot(brief: Dict[str, Any]) -> None:
             "index": len(versions),
             "prompt": brief.get("prompt", ""),
             "negative": brief.get("negative", ""),
-            "ip_adapter_weight": brief.get("ip_adapter_weight", 0.8),
+            "ip_adapter_weight": brief.get("ip_adapter_weight", 0.6),
             "reference_set": brief.get("reference_set", "default"),
         }
     )

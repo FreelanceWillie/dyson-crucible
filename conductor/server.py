@@ -1487,7 +1487,7 @@ class Handler(BaseHTTPRequestHandler):
     _SETTING_KEYS = [
         "brain", "ollama_model", "gemini_model",
         "gen.n_candidates", "gen.steps", "gen.cfg", "gen.width", "gen.height",
-        "gen.ip_adapter", "engine", "comfyui.checkpoint",
+        "gen.ip_adapter", "gen.ip_adapter_weight", "engine", "comfyui.checkpoint",
         "rank.clip_model", "vector.colors",
         "queue.max_retries", "queue.poll_seconds", "queue.restart_engine_on_fail",
     ]

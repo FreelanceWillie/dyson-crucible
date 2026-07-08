@@ -42,7 +42,8 @@ const GROUPS = [
     ['gen.cfg', 'Guidance (CFG)', { type: 'number', step: '0.1' }],
     ['gen.width', 'Width', { type: 'number', step: '8' }],
     ['gen.height', 'Height', { type: 'number', step: '8' }],
-    ['gen.ip_adapter', 'Use reference images (IP-Adapter)', { type: 'bool' }],
+    ['gen.ip_adapter', 'Use your reference images', { type: 'bool', hint: 'Off = ignore reference images, draw from your words only.' }],
+    ['gen.ip_adapter_weight', 'How closely to follow your reference images', { type: 'range', min: '0', max: '1', step: '0.05', hint: 'Left = follow your words more. Right = copy your reference look more. Around the middle is usually best. Applies to new heroes.' }],
     ['engine', 'Engine', { type: 'text' }],
     ['comfyui.checkpoint', 'Model checkpoint', { type: 'text' }],
   ]],
@@ -73,6 +74,14 @@ function fieldHtml(key, label, spec, val) {
     control = `<label class="row" style="gap:8px"><input type="checkbox" id="${id}" data-key="${key}" ${val ? 'checked' : ''}> <span>${esc(label)}</span></label>`;
     return `<div class="col" style="gap:4px">${control}${spec.hint ? `<div class="faint">${esc(spec.hint)}</div>` : ''}</div>`;
   }
+  if (spec.type === 'range') {
+    const v = (val == null ? spec.min || '0' : val);
+    control = `<div class="row" style="gap:10px;align-items:center">
+      <input type="range" id="${id}" data-key="${key}" min="${spec.min || 0}" max="${spec.max || 1}" step="${spec.step || 0.05}" value="${esc(v)}" style="flex:1"
+        oninput="var o=document.getElementById('${id}_val');if(o)o.textContent=this.value">
+      <span id="${id}_val" class="chip" style="min-width:38px;text-align:center">${esc(v)}</span></div>`;
+    return `<div class="col" style="gap:4px"><label for="${id}" class="faint">${esc(label)}</label>${control}${spec.hint ? `<div class="faint">${esc(spec.hint)}</div>` : ''}</div>`;
+  }
   if (spec.type === 'select') {
     const opts = (spec.opts || []).map((o) => `<option value="${esc(o)}" ${String(val) === o ? 'selected' : ''}>${esc(o)}</option>`).join('');
     control = `<select id="${id}" data-key="${key}" style="${ipt}">${opts}</select>`;
@@ -88,7 +97,7 @@ function readForm(root) {
   root.querySelectorAll('[data-key]').forEach((n) => {
     const key = n.dataset.key;
     if (n.type === 'checkbox') { out[key] = n.checked; }
-    else if (n.type === 'number') { const v = n.value.trim(); out[key] = v === '' ? null : Number(v); }
+    else if (n.type === 'number' || n.type === 'range') { const v = n.value.trim(); out[key] = v === '' ? null : Number(v); }
     else { out[key] = n.value; }
   });
   return out;

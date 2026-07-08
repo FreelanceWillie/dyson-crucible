@@ -67,6 +67,7 @@ DEFAULTS: Dict[str, Any] = {
         "width": 512,
         "height": 512,
         "ip_adapter": True,
+        "ip_adapter_weight": 0.6,
         "n_candidates": 4,
     },
     "queue": {

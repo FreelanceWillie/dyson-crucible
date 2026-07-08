@@ -56,7 +56,7 @@ def new(name: str, prompt: str) -> Dict[str, Any]:
         "name": name,
         "prompt": prompt,
         "negative": "",
-        "ip_adapter_weight": 0.8,
+        "ip_adapter_weight": 0.6,
         "reference_set": "default",
         "chat": [],       # list of {role, text, time} exchanges
         "versions": [],    # snapshots for undo/history (see snapshot())
@@ -131,7 +131,7 @@ def snapshot(brief: Dict[str, Any]) -> Dict[str, Any]:
         "index": len(versions),
         "prompt": copy.deepcopy(brief.get("prompt", "")),
         "negative": copy.deepcopy(brief.get("negative", "")),
-        "ip_adapter_weight": brief.get("ip_adapter_weight", 0.8),
+        "ip_adapter_weight": brief.get("ip_adapter_weight", 0.6),
         "reference_set": brief.get("reference_set", "default"),
         "candidates": copy.deepcopy(brief.get("last_candidates", [])),
         "time": datetime.utcnow().isoformat() + "Z",
