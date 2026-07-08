@@ -166,7 +166,14 @@ def idle(prompt: str, cfg: Dict[str, Any], out_dir: str, frames: int = 16,
 
     log("rendering %d-frame idle loop @ %dpx (this is slow on 4GB)..." % (frames, size))
     pid = _comfyui.submit(url, wf, _comfyui.new_client_id())
-    images = _comfyui.wait(url, pid, timeout=1800)  # AnimateDiff is slow
+    # AnimateDiff is slow; the GIF is written by VHS_VideoCombine (not a SaveImage),
+    # so wait() may report no images even on success -- tolerate that and still
+    # collect the GIF + the SaveImage frames below.
+    try:
+        images = _comfyui.wait(url, pid, timeout=1800)
+    except Exception as exc:
+        log("note: %s (recovering the GIF from the output folder)" % exc)
+        images = []
     frame_paths = []
     for i, img in enumerate(images or []):
         dst = os.path.join(out_dir, "frame_%02d.png" % i)

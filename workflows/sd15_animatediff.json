@@ -15,5 +15,6 @@
   "5":  {"class_type":"EmptyLatentImage","inputs":{"width":512,"height":512,"batch_size":16}},
   "3":  {"class_type":"KSampler","inputs":{"seed":0,"steps":20,"cfg":7.5,"sampler_name":"euler","scheduler":"normal","denoise":1.0,"model":["50",0],"positive":["6",0],"negative":["7",0],"latent_image":["5",0]}},
   "8":  {"class_type":"VAEDecode","inputs":{"samples":["3",0],"vae":["4",2]}},
-  "60": {"class_type":"VHS_VideoCombine","inputs":{"images":["8",0],"frame_rate":8,"loop_count":0,"filename_prefix":"dc_idle","format":"image/gif","pingpong":false,"save_output":true}}
+  "60": {"class_type":"VHS_VideoCombine","inputs":{"images":["8",0],"frame_rate":8,"loop_count":0,"filename_prefix":"dc_idle","format":"image/gif","pingpong":false,"save_output":true}},
+  "61": {"class_type":"SaveImage","inputs":{"filename_prefix":"dc_idle_frame","images":["8",0]}}
 }
