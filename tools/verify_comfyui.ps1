@@ -44,10 +44,11 @@ function Ensure-ComfyLauncher($root, $repoRoot) {
         $filtered = Join-Path $env:TEMP "comfy_reqs_no_torch.txt"
         Get-Content $reqs | Where-Object { $_ -notmatch '^\s*(torch|torchvision|torchaudio)([<>=!~ ].*)?$' } | Set-Content $filtered -Encoding ASCII
         & $py -m pip install -r $filtered 2>&1 | Out-Null
-        # Remove any torchaudio (a mismatched one from an earlier run crashes with a
-        # DLL error). ComfyUI image generation does not need it; its audio nodes just
-        # fail to import, which is non-fatal.
-        & $py -m pip uninstall -y torchaudio 2>&1 | Out-Null
+        # torchaudio IS required by modern ComfyUI core (comfy/sd.py). Ensure it is
+        # present AND matched to torch by installing from the SAME CUDA index (this
+        # is what prevents the DLL mismatch -- a torchaudio from the default PyPI
+        # index would not match a cu121 torch). Idempotent; downloads only if needed.
+        & $py -m pip install torchaudio --index-url https://download.pytorch.org/whl/cu121 2>&1 | Out-Null
     }
     $launcher = Join-Path $root "start_comfyui.bat"
     $lines = @('@echo off', ('cd /d "' + $comfyDir + '"'), ('"' + $py + '" main.py --lowvram %*'))
