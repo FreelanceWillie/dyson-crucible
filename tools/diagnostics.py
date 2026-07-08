@@ -49,9 +49,15 @@ def static_report():
     L.append("\n.venv python: %s" % ("present" if os.path.isfile(venv_py) else "MISSING"))
     # marker
     L.append(".dc_installed marker: %s" % ("yes" if os.path.isfile(os.path.join(ROOT, ".dc_installed")) else "no"))
-    # comfyui startup log
-    L.append("\n--- comfyui_startup.log (tail) ---")
-    L.append(tail(os.path.join(ROOT, "comfyui_startup.log"), 40))
+    # comfyui logs: the app's launch log AND the installer's verify test-launch logs
+    # (%TEMP%). One of these has the real reason ComfyUI will not start.
+    L.append("\n--- comfyui_startup.log (app launch, tail) ---")
+    L.append(tail(os.path.join(ROOT, "comfyui_startup.log"), 50))
+    tmp = os.environ.get("TEMP") or os.environ.get("TMP") or ""
+    for name in ("dc_comfy_verify.err.log", "dc_comfy_verify.out.log"):
+        p = os.path.join(tmp, name)
+        L.append("\n--- %s (installer test-launch, tail) ---" % name)
+        L.append(tail(p, 50))
     return "\n".join(L)
 
 
