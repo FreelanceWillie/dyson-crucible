@@ -17,5 +17,10 @@ open_clip_torch
 pillow
 pyyaml
 requests
-vtracer
+vtracer       # vectorize step (raster -> SVG)
+rembg         # bg_remove step (transparent sprites); downloads a small model on first use
 psutil        # live CPU/RAM/disk meters for the dashboard
+# Optional, not installed by default (heavy + fragile on Windows). Only needed for
+# AI upscaling; the 'upscale' step falls back to high-quality LANCZOS without them:
+#   realesrgan
+#   basicsr

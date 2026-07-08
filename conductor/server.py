@@ -1237,7 +1237,7 @@ class Handler(BaseHTTPRequestHandler):
             "Drop 8 to 20 style images in references/default/.")
         # python deps
         for mod, why in [("open_clip", "candidate ranking"), ("vtracer", "vectorizing"),
-                         ("psutil", "resource meters")]:
+                         ("rembg", "transparent sprites (bg remove)"), ("psutil", "resource meters")]:
             try:
                 __import__(mod)
                 add("Python: " + mod, True, "installed (" + why + ")", "")
