@@ -3,7 +3,7 @@
 // settings, delete). Owns #rail. Renders on 'state'; every mutation calls
 // refreshState() so the tree + assets refresh from the server.
 import { api } from './api.js';
-import { state, on, toast, refreshState, selectAsset, selectCategory } from './state.js';
+import { state, on, toast, refreshState, selectAsset, selectCategory, askModal } from './state.js';
 
 const el = () => document.getElementById('rail');
 const collapsed = {}; // path -> true when a node is folded shut
@@ -91,23 +91,31 @@ function deleteCategory(node) {
 }
 
 // ---- mutations ----------------------------------------------------------
-function addSub(parentPath) {
-  const name = prompt('Name of the new subcategory:');
-  if (!name || !name.trim()) { return; }
-  const path = (parentPath ? parentPath + '/' : '') + name.trim();
+async function addSub(parentPath) {
+  const vals = await askModal({
+    title: 'New category', submitLabel: 'Add category',
+    fields: [{ label: 'Name of the new category', placeholder: 'e.g. Frost, Enemies, UI', required: true }],
+  });
+  if (!vals || !vals[0]) { return; }
+  const path = (parentPath ? parentPath + '/' : '') + vals[0];
   api.catNew(path, parentPath || null)
     .then(() => { toast('Category added'); return refreshState(); })
     .catch((e) => toast('Could not add: ' + e.message, 'bad'));
 }
-function newHero() {
-  const name = prompt('Name this hero (short id, e.g. frost_knight):');
-  if (!name || !name.trim()) { return; }
-  const desc = prompt('Describe it in plain words:') || '';
+async function newHero() {
+  const vals = await askModal({
+    title: 'New Hero', submitLabel: 'Create hero',
+    fields: [
+      { label: 'What is this hero called?', placeholder: 'e.g. Frost Knight', required: true },
+      { label: 'Describe it in plain words', placeholder: 'a cute but evil frost warlock, glowing eyes', multiline: true },
+    ],
+  });
+  if (!vals || !vals[0]) { return; }
   const cat = state.currentCategory || '';
-  api.newHero(name.trim(), desc.trim(), cat)
+  api.newHero(vals[0], vals[1], cat)
     .then(() => refreshState())
-    .then(() => selectAsset(name.trim()))
-    .catch((e) => toast('Could not create: ' + e.message, 'bad'));
+    .then(() => selectAsset(vals[0]))
+    .catch((e) => toast(/exists/i.test(e.message || '') ? 'A hero with that name already exists.' : ('Could not create: ' + e.message), 'bad'));
 }
 
 // ---- rendering ----------------------------------------------------------

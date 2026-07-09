@@ -1,7 +1,7 @@
 // home.js - the default center view: the three entry points + the hero grid.
 // Owns #main only when state.view === 'home'.
 import { api } from './api.js';
-import { state, on, toast, refreshState, selectAsset, setView } from './state.js';
+import { state, on, toast, refreshState, selectAsset, setView, askModal } from './state.js';
 
 const el = () => document.getElementById('main');
 
@@ -38,23 +38,35 @@ function render() {
   }
 }
 
-function entry(kind) {
+async function entry(kind) {
   if (kind === 'surprise') { setView('explore'); return; }
   if (kind === 'find') { setView('taste'); return; }
   if (kind === 'animate') { setView('animate'); return; }
-  // new hero
-  const name = prompt('Name this hero (short id, e.g. frost_knight):');
+  await createHero();  // in-app form, not raw browser prompts
+}
+
+// Shared "name + describe -> create + generate" flow, used by the home entry point.
+export async function createHero() {
+  const vals = await askModal({
+    title: 'New Hero',
+    submitLabel: 'Create and generate',
+    fields: [
+      { label: 'What is this hero called?', placeholder: 'e.g. Frost Knight', required: true },
+      { label: 'Describe it in plain words', placeholder: 'a cute but evil frost warlock, glowing eyes, dark armor', multiline: true },
+    ],
+  });
+  if (!vals) { return; }
+  const [name, desc] = vals;
   if (!name) { return; }
-  const desc = prompt('Describe it in plain words:') || '';
-  const id = name.trim();
-  api.newHero(id, desc.trim(), '')
+  api.newHero(name, desc, '')
     .then(() => refreshState())
-    .then(() => selectAsset(id))
-    // auto-start the first batch so a new hero actually produces images (and warms
-    // the engine). The worker waits for ComfyUI to be ready before it runs.
-    .then(() => api.gen(id))
+    .then(() => selectAsset(name))
+    .then(() => api.gen(name))  // auto-start the first batch (worker waits for the engine)
     .then(() => toast('Making your hero... it appears in a minute or two (watch the Engine pill).', 'good'))
-    .catch((e) => toast('Could not create: ' + e.message, 'bad'));
+    .catch((e) => {
+      const msg = /exists/i.test(e.message || '') ? 'A hero with that name already exists. Pick another name.' : ('Could not create: ' + e.message);
+      toast(msg, 'bad');
+    });
 }
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }

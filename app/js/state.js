@@ -19,6 +19,50 @@ export const state = {
   prevJobStatus: {},    // job id -> status, for detecting completions
 };
 
+// Shared in-app modal form. Replaces raw browser prompt() dialogs so naming a
+// hero / style / category feels like the rest of the app (and drops the technical
+// "short id" language). Returns a Promise of the trimmed field values, or null if
+// cancelled. fields: [{label, placeholder?, value?, multiline?, required?}].
+const _MODAL_IN = 'width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:inherit;font:inherit';
+function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+export function askModal({ title, fields, submitLabel }) {
+  return new Promise((resolve) => {
+    const m = document.getElementById('modal');
+    if (!m) { resolve(null); return; }
+    m.classList.add('open');
+    const rows = (fields || []).map((f, i) => `
+      <div class="col" style="gap:4px">
+        ${f.label ? `<label class="faint" for="am-${i}">${_esc(f.label)}</label>` : ''}
+        ${f.multiline
+          ? `<textarea id="am-${i}" rows="3" placeholder="${_esc(f.placeholder || '')}" style="${_MODAL_IN};resize:vertical">${_esc(f.value || '')}</textarea>`
+          : `<input id="am-${i}" placeholder="${_esc(f.placeholder || '')}" value="${_esc(f.value || '')}" style="${_MODAL_IN}">`}
+      </div>`).join('');
+    m.innerHTML = `<div class="box"><div class="hd row"><b>${_esc(title || '')}</b><span style="flex:1"></span>`
+      + `<button class="btn sm ghost" id="am-x">&#10005;</button></div>`
+      + `<div class="bd col" style="gap:12px">${rows}`
+      + `<div class="row"><button class="btn primary" id="am-go">${_esc(submitLabel || 'OK')}</button></div></div></div>`;
+    const done = (val) => { m.classList.remove('open'); m.innerHTML = ''; document.removeEventListener('keydown', key); resolve(val); };
+    const key = (e) => { if (e.key === 'Escape') { done(null); } };
+    document.addEventListener('keydown', key);
+    m.querySelector('#am-x').onclick = () => done(null);
+    const submit = () => {
+      const vals = (fields || []).map((f, i) => (document.getElementById('am-' + i).value || '').trim());
+      if (fields && fields[0] && fields[0].required && !vals[0]) { document.getElementById('am-0').focus(); return; }
+      done(vals);
+    };
+    m.querySelector('#am-go').onclick = submit;
+    (fields || []).forEach((f, i) => {
+      const el = document.getElementById('am-' + i);
+      if (!el) { return; }
+      el.onkeydown = (e) => {
+        if (e.key === 'Enter' && !f.multiline) { e.preventDefault(); submit(); }
+        else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submit(); }
+      };
+    });
+    const first = document.getElementById('am-0'); if (first) { first.focus(); }
+  });
+}
+
 // toast helper (used everywhere)
 export function toast(msg, kind) {
   const wrap = document.getElementById('toasts');

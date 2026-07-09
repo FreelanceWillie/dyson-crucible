@@ -3,7 +3,7 @@
 // #btnPalette, and window keydown. Talks to the rest of the app only through
 // emit()/setView()/api - never reaches into other modules.
 import { api } from './api.js';
-import { state, on, emit, toast, setView } from './state.js';
+import { state, on, emit, toast, setView, askModal } from './state.js';
 
 // ----- plain-language copy for the help overlay + tutorial -------------------
 const HELP_COPY = {
@@ -86,17 +86,22 @@ const ACTIONS = [
   { name: 'Tutorial', hint: 'Take the guided tour', run: () => emit('open', 'tutorial') },
 ];
 
-function newHero() {
-  const name = prompt('Name this hero (short id, e.g. frost_knight):');
-  if (!name) { return; }
-  const desc = prompt('Describe it in plain words:') || '';
-  const id = name.trim();
-  api.newHero(id, desc.trim(), '')
+async function newHero() {
+  const vals = await askModal({
+    title: 'New Hero', submitLabel: 'Create and generate',
+    fields: [
+      { label: 'What is this hero called?', placeholder: 'e.g. Frost Knight', required: true },
+      { label: 'Describe it in plain words', placeholder: 'a cute but evil frost warlock, glowing eyes', multiline: true },
+    ],
+  });
+  if (!vals || !vals[0]) { return; }
+  const id = vals[0];
+  api.newHero(id, vals[1], '')
     .then(() => setView('asset', id))
     // auto-start the first batch so the hero actually produces images
     .then(() => api.gen(id))
     .then(() => toast('Making your hero... it appears in a minute or two (watch the Engine pill).', 'good'))
-    .catch((e) => toast('Could not create: ' + e.message, 'bad'));
+    .catch((e) => toast(/exists/i.test(e.message || '') ? 'A hero with that name already exists.' : ('Could not create: ' + e.message), 'bad'));
 }
 function doGen() {
   if (!state.current) { toast('Pick a hero first, then Generate.'); return; }

@@ -3,7 +3,7 @@
 // different takes; like the ones you want, then combine them into one direction
 // you can start a hero from.
 import { api } from './api.js';
-import { state, on, toast, refreshState, selectAsset, setView } from './state.js';
+import { state, on, toast, refreshState, selectAsset, setView, askModal } from './state.js';
 
 const ASSET = 'explore'; // the moodboard slot this view owns
 const POLL_MS = 2000;
@@ -304,16 +304,19 @@ async function combinePicks() {
   }
 }
 
-function startHero() {
+async function startHero() {
   if (!vm.combined) { return; }
-  const name = prompt('Name this hero (short id, e.g. frost_knight):');
-  if (!name || !name.trim()) { return; }
-  const id = name.trim();
+  const vals = await askModal({
+    title: 'Name this hero', submitLabel: 'Create hero',
+    fields: [{ label: 'What is this hero called?', placeholder: 'e.g. Frost Knight', required: true }],
+  });
+  if (!vals || !vals[0]) { return; }
+  const id = vals[0];
   stopPoll();
   api.newHero(id, vm.combined.prompt || '', vm.category || '')
     .then(() => refreshState())
     .then(() => selectAsset(id))
-    .catch((e) => toast('Could not create: ' + (e ? e.message : 'error'), 'bad'));
+    .catch((e) => toast(/exists/i.test(e && e.message || '') ? 'A hero with that name already exists.' : ('Could not create: ' + (e ? e.message : 'error')), 'bad'));
 }
 
 function saveAsCategory() {

@@ -2,7 +2,7 @@
 // what he wants. Rate rounds of images 1-5 stars; the loved pool (>=4) steers the
 // next round; save the emerged look as a Style. Owns #main only when view==='taste'.
 import { api } from './api.js';
-import { state, on, toast, refreshState, setView } from './state.js';
+import { state, on, toast, refreshState, setView, askModal } from './state.js';
 
 const el = () => document.getElementById('main');
 
@@ -82,11 +82,14 @@ function rate(im, stars) {
   api.tasteRate(session.id, im.path, stars).catch((e) => toast('Rate failed: ' + friendly(e), 'bad'));
 }
 
-function save() {
+async function save() {
   if (!session) { return; }
-  const name = prompt('Name this Style (short id, e.g. brass_gloom):');
-  if (!name) { return; }
-  api.tasteSave(session.id, name.trim())
+  const vals = await askModal({
+    title: 'Save this style', submitLabel: 'Save style',
+    fields: [{ label: 'Name this style', placeholder: 'e.g. Brass Gloom, Cozy Pixel', required: true }],
+  });
+  if (!vals || !vals[0]) { return; }
+  api.tasteSave(session.id, vals[0])
     .then(() => { toast('Saved as a Style'); return refreshState(); })
     .catch((e) => toast('Could not save: ' + friendly(e), 'bad'));
 }
