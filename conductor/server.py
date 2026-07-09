@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import re
 import shutil
 import sys
 import threading
@@ -1472,6 +1473,98 @@ class Handler(BaseHTTPRequestHandler):
                     briefmod.save(name, b, paths["briefs"])
                     out["brief"] = b
                     out["reply"] = "Moved " + name + " into " + (cat or "no category") + "."
+            elif action == "pause":
+                jobs.set_paused(True)
+                out["reply"] = "Paused the queue. Nothing new runs until you resume."
+            elif action == "resume":
+                jobs.set_paused(False)
+                out["reply"] = "Queue resumed. Jobs will run again."
+            elif action == "reclaim":
+                jobs.set_paused(True)
+                freed = False
+                try:
+                    import comfyui as _c  # type: ignore
+                    curl = (conf.get("comfyui", {}) or {}).get("url", "")
+                    if curl:
+                        _c.interrupt(curl)
+                        freed = _c.free_vram(curl)
+                except Exception:
+                    pass
+                out["reply"] = ("Reclaimed your machine. Paused the queue, stopped the current job"
+                                + (", freed the GPU." if freed else "."))
+            elif action == "set_model":
+                want = (p.get("name") or message or "").strip().lower()
+                toks = [t for t in re.split(r"[^a-z0-9]+", want) if len(t) > 2]
+                inst = set(ckptmod.installed(conf))
+                def _hit(c):
+                    hay = (c.get("name", "") + " " + c.get("id", "") + " "
+                           + " ".join(c.get("tags", []))).lower()
+                    return any(t in hay for t in toks)
+                cat = ckptmod.catalog()
+                pick = next((c for c in cat if c["filename"] in inst and _hit(c)), None) \
+                    or next((c for c in cat if _hit(c)), None)
+                if pick and pick["filename"] in inst:
+                    _write_checkpoint(pick["filename"])
+                    out["reply"] = "Now drawing with " + pick["name"] + "."
+                elif pick:
+                    out["reply"] = (pick["name"] + " isn't downloaded yet. Open Settings, "
+                                    "Art style engine, to get it.")
+                else:
+                    fm = next((f for f in inst if toks and toks[0] in f.lower()), None)
+                    if fm:
+                        _write_checkpoint(fm)
+                        out["reply"] = "Now drawing with " + fm + "."
+                    else:
+                        out["reply"] = ("I couldn't find a model matching that. Open Settings, "
+                                        "Art style engine, to pick or download one.")
+            elif action == "pick":
+                name = context.get("asset")
+                if not (name and briefmod.exists(name, paths["briefs"])):
+                    out["reply"] = "Open a hero first, then tell me which candidate to pick."
+                else:
+                    _vn, cands = _candidate_urls(paths, name)
+                    n = 0
+                    try:
+                        n = int(p.get("n") or 0)
+                    except (TypeError, ValueError):
+                        n = 0
+                    if not n:
+                        mnum = re.search(r"\d+", message or "")
+                        n = int(mnum.group()) if mnum else 0
+                    if 1 <= n <= len(cands):
+                        src = _url_to_fspath(paths, cands[n - 1])
+                        dst = os.path.join(_asset_out_dir(paths, name), "chosen.png")
+                        os.makedirs(os.path.dirname(dst), exist_ok=True)
+                        shutil.copyfile(src, dst)
+                        b = briefmod.load(name, paths["briefs"])
+                        b["chosen"] = dst
+                        briefmod.save(name, b, paths["briefs"])
+                        out["chosen"] = "/outputs/{0}/chosen.png".format(name)
+                        out["reply"] = "Picked candidate " + str(n) + " as the winner."
+                    else:
+                        out["reply"] = ("Tell me which one, like 'pick 1' or 'pick 3'. There are "
+                                        + str(len(cands)) + " to choose from.")
+            elif action == "finish":
+                name = context.get("asset")
+                chosen = os.path.join(_asset_out_dir(paths, name), "chosen.png") if name else None
+                if not (name and chosen and os.path.isfile(chosen)):
+                    out["reply"] = ("Pick a winner first (open a hero and choose a candidate), "
+                                    "then I can finish it.")
+                else:
+                    style = (p.get("style") or message or "").lower()
+                    chain = ("pixel_sprite" if "pixel" in style
+                             else "to_vector" if ("vector" in style or "svg" in style)
+                             else "game_sprite" if "sprite" in style
+                             else "hi_res" if ("upscale" in style or "bigger" in style or "hi res" in style or "hi-res" in style)
+                             else "comic" if "comic" in style
+                             else "gameboy" if ("gameboy" in style or "game boy" in style)
+                             else "retro_crt" if ("crt" in style or "scanline" in style)
+                             else "clean_png")  # default: trimmed transparent PNG
+                    out_dir = os.path.join(_asset_out_dir(paths, name), "_post")
+                    out["job"] = jobs.enqueue(name, "post",
+                                              {"src": chosen, "chain_name": chain, "out_dir": out_dir})
+                    out["reply"] = ("Finishing " + name + " as " + chain.replace("_", " ")
+                                    + ". Check the queue for the result.")
             else:  # help / chat -> a real conversational reply from the brain
                 hist = context.get("history") or []
                 out["reply"] = brain.chat(p.get("text") or message, hist, conf,

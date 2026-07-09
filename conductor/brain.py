@@ -750,6 +750,12 @@ INTERPRET_SYSTEM = (
     "  refine        {feedback}                e.g. 'more armor, less blue'\n"
     "  generate      {}                        e.g. 'make some', 'gen it'\n"
     "  assign        {category}                e.g. 'put this in the Frost category'\n"
+    "  set_model     {name}                    e.g. 'use the toon model', 'switch to realistic'\n"
+    "  finish        {style}                   e.g. 'make it a pixel sprite', 'vectorize it', 'transparent png'\n"
+    "  pick          {n}                        e.g. 'pick the 2nd one', 'I like number 3'\n"
+    "  pause         {}                        e.g. 'pause the queue'\n"
+    "  resume        {}                        e.g. 'resume'\n"
+    "  reclaim       {}                        e.g. 'free my gpu', 'reclaim the machine'\n"
     "  help          {}                        e.g. 'how do I ...'\n"
     "  chat          {text}                    anything else\n\n"
     'Output ONLY a JSON object: {"action":"...","params":{...}}. No prose.'
@@ -775,6 +781,28 @@ def _looks_like_question(message):
     return low.startswith(_QUESTION_STARTS)
 
 
+_RECLAIM_RE = re.compile(
+    r"\b(reclaim|free (up )?(the |my )?(gpu|vram|machine|card)|take back my (machine|computer|pc|gpu)"
+    r"|kill switch|stop everything|emergency stop)\b")
+
+
+def _quick_route(message):
+    """Unambiguous machine-control commands, routed deterministically so they work
+    even when the small local model would mis-classify them."""
+    low = (message or "").strip().lower().rstrip(".!")
+    words = low.split()
+    if not words:
+        return None
+    if _RECLAIM_RE.search(low):
+        return {"action": "reclaim", "params": {}}
+    short = len(words) <= 4  # only treat terse imperatives as queue control
+    if short and re.search(r"\b(pause|hold|halt)\b", low):
+        return {"action": "pause", "params": {}}
+    if short and re.search(r"\b(resume|unpause|un-pause)\b", low):
+        return {"action": "resume", "params": {}}
+    return None
+
+
 def interpret(message, context, cfg):
     """Classify a chat message into {action, params}. Falls back to 'refine' if
     an asset is selected (so plain feedback still works) else 'chat'."""
@@ -782,6 +810,16 @@ def interpret(message, context, cfg):
     # asking a small model, which tends to mis-route "how do I ...?" to an action.
     if _looks_like_question(message):
         return {"action": "chat", "params": {"text": message}}
+    quick = _quick_route(message)
+    if quick:
+        return quick
+    # Post-process ("finish") intents use high-signal words the small model tends to
+    # misread as chat. Only when a hero is selected (you finish a chosen winner).
+    low = (message or "").lower()
+    if (context or {}).get("asset") and re.search(
+            r"\b(pixel ?sprite|pixelate|vectori[sz]e|vector|svg|transparent png|upscale|"
+            r"game ?boy|scanlines?|crt|comic book|halftone|duotone)\b", low):
+        return {"action": "finish", "params": {"style": message}}
     ctx = "selected asset: {0}; selected category: {1}".format(
         (context or {}).get("asset"), (context or {}).get("category"))
     try:
