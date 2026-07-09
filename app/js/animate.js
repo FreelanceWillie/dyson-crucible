@@ -17,6 +17,11 @@ async function render() {
   const m = el(); if (!m) { return; }
   if (!poses.length) { try { poses = (await api.poses()).poses || []; } catch (_) {} }
   const assets = (state.assets || []).filter((a) => a.thumb);
+  // preselect the currently-open hero (e.g. when arriving from the asset "Poses" button)
+  if (!hero && state.current) {
+    const cur = assets.find((a) => a.name === state.current);
+    if (cur) { hero = cur.thumb; }
+  }
 
   m.innerHTML = `
     <div class="col" style="gap:16px;max-width:900px">

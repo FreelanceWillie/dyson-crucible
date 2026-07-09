@@ -401,15 +401,9 @@ function galleryBlock() {
     const poses = document.createElement('button');
     poses.className = 'btn';
     poses.textContent = 'Poses';
-    poses.onclick = () => {
-      const raw = prompt('List poses, comma-separated (e.g. idle, walk, attack, hurt):', 'idle, walk, attack, hurt');
-      if (!raw) { return; }
-      const list = raw.split(',').map((s) => s.trim()).filter(Boolean);
-      if (!list.length) { return; }
-      api.poses(state.current, list)
-        .then(() => toast('Poses queued'))
-        .catch((e) => toast('Could not queue poses: ' + e.message, 'bad'));
-    };
+    // Open the Animate view (proper pose-picker with tiles), current hero preselected,
+    // instead of a raw comma-separated prompt.
+    poses.onclick = () => setView('animate');
 
     const post = document.createElement('button');
     post.className = 'btn ghost';
