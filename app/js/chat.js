@@ -155,9 +155,22 @@ async function submit(raw) {
   const send = document.getElementById('chatsend');
   if (send) { send.disabled = true; }
 
+  // "thinking" indicator so the panel is never silent while the brain works
+  const cl = document.getElementById('chatlog');
+  let thinking = null;
+  if (cl) {
+    thinking = document.createElement('div');
+    thinking.innerHTML = '<div class="row" style="gap:6px;align-items:center;padding:4px 2px">'
+      + '<span class="spinner"></span><span class="faint">thinking...</span></div>';
+    cl.appendChild(thinking);
+    scrollDown();
+  }
+  const dropThinking = () => { if (thinking) { thinking.remove(); thinking = null; } };
+
   const context = { asset: state.current, category: state.currentCategory, scope: sc };
   try {
     const res = await api.command(message, context, autoGen) || {};
+    dropThinking();
 
     // surface the assistant's words: prefer reply, fall back to a summary
     const reply = res.reply || res.summary || res.message || '';
@@ -181,6 +194,7 @@ async function submit(raw) {
       append({ role: 'assistant', text: reply || 'Done.' });
     }
   } catch (e) {
+    dropThinking();
     append({ role: 'assistant', text: 'Could not do that: ' + (e && e.message ? e.message : 'error') });
     toast('Command failed: ' + (e && e.message ? e.message : 'error'), 'bad');
   } finally {

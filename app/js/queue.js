@@ -32,12 +32,14 @@ function renderRes() {
   // Engine (ComfyUI) status pill so he knows when he can actually generate.
   const eng = (r.engine && r.engine.state) || 'off';
   const engMap = {
-    ready: ['&#9679; Engine ready', 'var(--good)'],
-    warming: ['&#9673; Engine warming up...', 'var(--accent,#6cf)'],
-    off: ['&#9675; Engine off', 'var(--faint,#888)'],
+    ready: ['&#9679; Engine ready', 'var(--good)', 'ComfyUI is up. Generation runs immediately.'],
+    warming: ['&#9673; Engine warming up (first run ~1-2 min)', 'var(--accent,#6cf)',
+      'ComfyUI is starting and loading the model. The first run of a session is slow; later ones are fast.'],
+    off: ['&#9675; Engine off', 'var(--faint,#888)',
+      'ComfyUI is not running. It starts automatically the first time you generate (~1-2 min).'],
   };
-  const [engTxt, engCol] = engMap[eng] || engMap.off;
-  parts.push(`<span class="chip" title="ComfyUI, the image engine" style="color:${engCol};border-color:${engCol}">${engTxt}</span>`);
+  const [engTxt, engCol, engTip] = engMap[eng] || engMap.off;
+  parts.push(`<span class="chip" title="${engTip}" style="color:${engCol};border-color:${engCol}">${engTxt}</span>`);
   const dc = r.dc || null;
   if (r.cpu_pct != null) {
     if (dc) {
