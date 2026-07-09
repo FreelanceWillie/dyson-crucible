@@ -1039,6 +1039,24 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(self._run_command(conf, paths, message, context, bool(data.get("gen", True))))
             return
 
+        if path == "/api/chat/clear":
+            scope = (data.get("scope") or "global").strip()
+            asset = (data.get("name") or data.get("asset") or "").strip()
+            try:
+                if scope == "global":
+                    fp = self._global_chat_file(paths)
+                    os.makedirs(paths["outputs"], exist_ok=True)
+                    with open(fp, "w", encoding="utf-8") as fh:
+                        json.dump([], fh)
+                elif asset and briefmod.exists(asset, paths["briefs"]):
+                    b = briefmod.load(asset, paths["briefs"])
+                    b["chat"] = []
+                    briefmod.save(asset, b, paths["briefs"])
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500); return
+            self._send_json({"ok": True, "scope": scope})
+            return
+
         if path == "/api/synthesize":
             # merge cherry-picked takes into one direction (optionally save to a category)
             phrase = (data.get("phrase") or "").strip()

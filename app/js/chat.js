@@ -56,9 +56,12 @@ function render() {
     : `<div class="faint" style="margin:auto 0">No messages yet. Say what you want below.</div>`;
 
   p.innerHTML = `
-    <div class="row" style="justify-content:space-between;margin-bottom:2px">
+    <div class="row" style="justify-content:space-between;margin-bottom:2px;align-items:center">
       <b style="font-size:14px">${head}</b>
-      <span class="chip">${asset ? 'asset' : 'global'}</span>
+      <span class="row" style="gap:6px;align-items:center">
+        <span class="chip">${asset ? 'asset' : 'global'}</span>
+        ${log.length ? '<button class="btn sm ghost" id="chatclear" title="Clear this conversation">Clear</button>' : ''}
+      </span>
     </div>
     <div class="faint" style="margin-bottom:8px">${hint}</div>
     <div id="chatlog" style="flex:1 1 auto;overflow:auto;display:flex;flex-direction:column;gap:8px;
@@ -77,6 +80,8 @@ function render() {
       </div>
     </div>`;
 
+  const clr = p.querySelector('#chatclear');
+  if (clr) { clr.onclick = () => clearChat(); }
   const gen = p.querySelector('#chatgen');
   if (gen) { gen.onchange = () => { autoGen = gen.checked; }; }
   const ta = p.querySelector('#chatinput');
@@ -123,6 +128,18 @@ async function loadHistory() {
     log = [];
   }
   render();
+}
+
+async function clearChat() {
+  const sc = scope();
+  try {
+    await api.chatClear(sc, state.current);
+    log = [];
+    render();
+    toast('Chat cleared');
+  } catch (e) {
+    toast('Could not clear: ' + (e && e.message ? e.message : 'error'), 'bad');
+  }
 }
 
 async function submit(raw) {
