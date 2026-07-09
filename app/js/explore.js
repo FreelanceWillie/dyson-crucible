@@ -133,13 +133,19 @@ function renderBoard() {
   if (vm.status === 'requesting') {
     head = '<div class="row" style="gap:8px;align-items:center"><span class="spinner"></span> <span class="faint">Asking the brain for directions...</span></div>';
   } else if (vm.status === 'pending') {
+    const wait = state.queuePaused
+      ? ' <span class="warn">The queue is paused. Click Resume up top to start it.</span>'
+      : ' <span class="faint">Waiting on ComfyUI. First run warms up slowly. If nothing appears, check the health panel up top.</span>';
     head = `<div class="row" style="gap:8px;align-items:center"><span class="spinner"></span> <span class="chip">${rendered} of ${total} rendered</span>`
-      + (rendered === 0 ? ' <span class="faint">Waiting on ComfyUI. If nothing appears, check the health panel up top.</span>' : '')
+      + (rendered === 0 ? wait : '')
       + '</div>';
   } else if (vm.status === 'done') {
     head = `<div class="row" style="gap:8px;align-items:center"><span class="chip">${rendered} of ${total} rendered</span> <span class="faint">Done. Like the ones you want, then combine.</span></div>`;
   } else if (vm.status === 'failed') {
-    head = `<div class="card"><b class="warn">The board stalled.</b><div class="faint">${rendered} of ${total} rendered. ComfyUI may be down, check the health panel up top, then try again.</div></div>`;
+    const why = state.queuePaused
+      ? 'The queue is paused. Click Resume in the top bar, then try again.'
+      : 'ComfyUI may be down, check the health panel up top, then try again.';
+    head = `<div class="card"><b class="warn">The board stalled.</b><div class="faint">${rendered} of ${total} rendered. ${why}</div></div>`;
   }
 
   if (!takes.length && (vm.status === 'done' || vm.status === 'failed')) {

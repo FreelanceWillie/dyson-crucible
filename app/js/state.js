@@ -37,6 +37,7 @@ export async function refreshState() {
     state.assets = s.assets || [];
     state.brain = s.brain || state.brain;
     state.tree = cats.tree || [];
+    state.queuePaused = !!s.queue_paused;
     state.online = true;
     emit('state', state);
   } catch (e) {
