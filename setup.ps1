@@ -84,6 +84,33 @@ Write-Host "[4/8] Installing Python dependencies..." -ForegroundColor Yellow
 & $venvPy -m pip install -r requirements.txt
 
 # ---------------------------------------------------------------------
+# 4b. Repair torch if a dependency pulled a CPU build over the CUDA one.
+# ---------------------------------------------------------------------
+# requirements.txt pulls open_clip_torch etc., which depend on torch; if the
+# CUDA install above did not take (or a transitive dep resolved a plain PyPI
+# torch), the venv can end up with a CPU-only torch and ComfyUI dies with
+# "Torch not compiled with CUDA enabled". On a machine that HAS an NVIDIA GPU,
+# detect that and force-reinstall the matched CUDA stack from the cu121 index.
+Write-Host ""
+Write-Host "[4b/8] Verifying torch is the CUDA build..." -ForegroundColor Yellow
+$hasGpu = $false
+try { nvidia-smi -L 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { $hasGpu = $true } } catch { $hasGpu = $false }
+if ($hasGpu) {
+    $torchKind = (& $venvPy -c "import torch,sys; sys.stdout.write('cuda' if torch.version.cuda else 'cpu')" 2>$null)
+    if ($torchKind -ne "cuda") {
+        Write-Host "      torch is a CPU build ($torchKind) but you have an NVIDIA GPU. Reinstalling the CUDA build..." -ForegroundColor Yellow
+        & $venvPy -m pip install --force-reinstall torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+        $torchKind = (& $venvPy -c "import torch,sys; sys.stdout.write('cuda' if torch.version.cuda else 'cpu')" 2>$null)
+        if ($torchKind -eq "cuda") { Write-Host "      torch CUDA build restored." -ForegroundColor Green }
+        else { Write-Host "      Still not a CUDA torch. ComfyUI will fail on GPU; check the pip output above." -ForegroundColor Red }
+    } else {
+        Write-Host "      torch has CUDA. Good." -ForegroundColor Green
+    }
+} else {
+    Write-Host "      No NVIDIA GPU detected; leaving torch as-is (CPU is expected here)." -ForegroundColor DarkYellow
+}
+
+# ---------------------------------------------------------------------
 # 5. GPU check
 # ---------------------------------------------------------------------
 Write-Host ""
