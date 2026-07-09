@@ -1392,6 +1392,8 @@ class Handler(BaseHTTPRequestHandler):
                                    {"directions": dirs, "out_dir": out_dir,
                                     "base_brief": self._explore_base(cat)})
                 out.update({"job": job, "asset": asset, "directions": dirs})
+                out["reply"] = ("On it. Starting a Surprise Me run for \"" + phrase
+                                + "\", " + str(n) + " takes. Watch the queue, then open the tiles.")
             elif action == "new_category":
                 name = (p.get("name") or "").strip()
                 look = (p.get("look") or "").strip()
@@ -1406,6 +1408,8 @@ class Handler(BaseHTTPRequestHandler):
                                            {"directions": dirs, "out_dir": out_dir,
                                             "base_brief": self._explore_base(name)})
                         out.update({"job": job, "asset": name, "directions": dirs})
+                    out["reply"] = ("Made the category \"" + name + "\""
+                                    + ((", exploring " + str(n) + " looks now.") if n > 0 else "."))
             elif action == "refine":
                 name = context.get("asset")
                 if name and briefmod.exists(name, paths["briefs"]):
@@ -1415,12 +1419,15 @@ class Handler(BaseHTTPRequestHandler):
                     out["brief"] = b
                     if do_gen:
                         out["job"] = self._enqueue_gen(conf, paths, name)
+                    out["reply"] = ("Got it, updated " + name + ". "
+                                    + ("Drawing a new batch now." if do_gen else "Saved. Press Generate when ready."))
                 else:
                     out["reply"] = "Pick or create a hero first, then tell me what to change."
             elif action == "generate":
                 name = context.get("asset")
                 if name and briefmod.exists(name, paths["briefs"]):
                     out["job"] = self._enqueue_gen(conf, paths, name)
+                    out["reply"] = "Queued a fresh batch for " + name + "."
                 else:
                     out["reply"] = "Select a hero to generate."
             elif action == "assign":
@@ -1431,6 +1438,7 @@ class Handler(BaseHTTPRequestHandler):
                     b["category"] = cat or None
                     briefmod.save(name, b, paths["briefs"])
                     out["brief"] = b
+                    out["reply"] = "Moved " + name + " into " + (cat or "no category") + "."
             else:  # help / chat -> a real conversational reply from the brain
                 hist = context.get("history") or []
                 out["reply"] = brain.chat(p.get("text") or message, hist, conf,

@@ -756,9 +756,32 @@ INTERPRET_SYSTEM = (
 )
 
 
+_QUESTION_STARTS = (
+    "how ", "how's", "hows", "what ", "what's", "whats", "why ", "when ", "where ",
+    "who ", "which ", "can i", "can you", "could you", "do you", "did you", "does ",
+    "is it", "is this", "is there", "are you", "should i", "help",
+)
+
+
+def _looks_like_question(message):
+    """True for plain how-to / interrogative messages that want an ANSWER, not an
+    action. A small local model mislabels these as commands, so we catch them in
+    code first and route them to conversation."""
+    low = (message or "").strip().lower()
+    if not low:
+        return False
+    if low.endswith("?"):
+        return True
+    return low.startswith(_QUESTION_STARTS)
+
+
 def interpret(message, context, cfg):
     """Classify a chat message into {action, params}. Falls back to 'refine' if
     an asset is selected (so plain feedback still works) else 'chat'."""
+    # Questions want a reply, not a command. Decide this deterministically before
+    # asking a small model, which tends to mis-route "how do I ...?" to an action.
+    if _looks_like_question(message):
+        return {"action": "chat", "params": {"text": message}}
     ctx = "selected asset: {0}; selected category: {1}".format(
         (context or {}).get("asset"), (context or {}).get("category"))
     try:
