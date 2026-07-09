@@ -8,6 +8,22 @@ function meter(label, pct, sub) {
   return `<span class="meter ${cls}" title="${label} ${sub || ''}">${label}<span class="bar"><i style="width:${Math.max(0, Math.min(100, pct || 0))}%"></i></span></span>`;
 }
 
+const clampPct = (v) => Math.max(0, Math.min(100, v || 0));
+
+// A two-segment meter: the Dyson Crucible share (accent) + everything else (muted),
+// each labelled with its % of the machine's max. Lets the user see whether the tool
+// or some OTHER program is the resource sink.
+function splitMeter(label, dcPct, otherPct, title) {
+  const d = clampPct(dcPct), o = clampPct(otherPct);
+  return `<span style="display:inline-flex;align-items:center;gap:5px" title="${title || ''}">`
+    + `<span style="font-size:11px">${label}</span>`
+    + `<span style="width:66px;height:8px;border-radius:4px;overflow:hidden;background:var(--line,#333);display:inline-flex">`
+    + `<span style="width:${d}%;background:var(--accent,#6cf)"></span>`
+    + `<span style="width:${o}%;background:var(--faint,#888)"></span></span>`
+    + `<span style="font-size:11px;color:var(--faint,#888)">DC ${d.toFixed(0)}% &middot; other ${o.toFixed(0)}%</span>`
+    + `</span>`;
+}
+
 function renderRes() {
   const r = state.resources; const bar = document.getElementById('resbar');
   if (!bar) { return; }
@@ -22,11 +38,28 @@ function renderRes() {
   };
   const [engTxt, engCol] = engMap[eng] || engMap.off;
   parts.push(`<span class="chip" title="ComfyUI, the image engine" style="color:${engCol};border-color:${engCol}">${engTxt}</span>`);
-  if (r.cpu_pct != null) { parts.push(meter('CPU', r.cpu_pct)); }
-  if (r.ram) { parts.push(meter('RAM', r.ram.pct, `${(r.ram.used_mb / 1024).toFixed(1)}/${(r.ram.total_mb / 1024).toFixed(1)}GB`)); }
-  if (r.gpu) { parts.push(meter('GPU', r.gpu.util_pct, r.gpu.name));
-    parts.push(meter('VRAM', r.gpu.vram_pct, `${r.gpu.vram_used_mb}/${r.gpu.vram_total_mb}MB`)); }
-  else { parts.push('<span class="chip">CPU only</span>'); }
+  const dc = r.dc || null;
+  if (r.cpu_pct != null) {
+    if (dc) {
+      const dcc = dc.cpu_pct || 0;
+      parts.push(splitMeter('CPU', dcc, r.cpu_pct - dcc, `Dyson Crucible ${dcc.toFixed(0)}% of CPU, everything else ${(r.cpu_pct - dcc).toFixed(0)}%`));
+    } else { parts.push(meter('CPU', r.cpu_pct)); }
+  }
+  if (r.ram) {
+    if (dc) {
+      const dcp = 100 * dc.ram_mb / (r.ram.total_mb || 1);
+      parts.push(splitMeter('RAM', dcp, r.ram.pct - dcp,
+        `Dyson Crucible ${(dc.ram_mb / 1024).toFixed(1)}GB, other ${((r.ram.used_mb - dc.ram_mb) / 1024).toFixed(1)}GB of ${(r.ram.total_mb / 1024).toFixed(1)}GB`));
+    } else { parts.push(meter('RAM', r.ram.pct, `${(r.ram.used_mb / 1024).toFixed(1)}/${(r.ram.total_mb / 1024).toFixed(1)}GB`)); }
+  }
+  if (r.gpu) {
+    parts.push(meter('GPU', r.gpu.util_pct, r.gpu.name));
+    if (dc) {
+      const dcv = 100 * dc.vram_mb / (r.gpu.vram_total_mb || 1);
+      parts.push(splitMeter('VRAM', dcv, r.gpu.vram_pct - dcv,
+        `Dyson Crucible ${dc.vram_mb}MB, other ${r.gpu.vram_used_mb - dc.vram_mb}MB of ${r.gpu.vram_total_mb}MB`));
+    } else { parts.push(meter('VRAM', r.gpu.vram_pct, `${r.gpu.vram_used_mb}/${r.gpu.vram_total_mb}MB`)); }
+  } else { parts.push('<span class="chip">CPU only</span>'); }
   const paused = r.queue_paused;
   parts.push(`<button class="btn sm" id="qpause">${paused ? '&#9654; Resume' : '&#10073;&#10073; Pause'}</button>`);
   parts.push(`<button class="btn sm bad" id="qpanic" title="Pause, stop the current gen, and free the GPU">&#9888; Reclaim machine</button>`);
