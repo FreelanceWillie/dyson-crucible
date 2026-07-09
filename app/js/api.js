@@ -80,6 +80,7 @@ export const api = {
   capabilities: () => GET('/api/capabilities'),
   installCapability: (group) => POST('/api/capabilities/install', { group }),
   // checkpoints (the "art style engine": curated base models)
+  brainModels: () => GET('/api/brain/models'),
   checkpoints: () => GET('/api/checkpoints'),
   checkpointInstall: (id, select) => POST('/api/checkpoints/install', { id, select }),
   checkpointSelect: (filename) => POST('/api/checkpoints/select', { filename }),

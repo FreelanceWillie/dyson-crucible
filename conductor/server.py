@@ -568,6 +568,21 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(st)
             return
 
+        if path == "/api/brain/models":
+            # Installed local (Ollama) models, so Settings can offer a dropdown
+            # instead of a free-text box. Empty list if Ollama is not reachable.
+            models = []
+            try:
+                import urllib.request as _u
+                url = (conf.get("ollama_url") or "http://localhost:11434").rstrip("/")
+                with _u.urlopen(url + "/api/tags", timeout=3) as r:
+                    data = json.loads(r.read().decode("utf-8"))
+                models = sorted(m.get("name", "") for m in (data.get("models") or []) if m.get("name"))
+            except Exception:
+                models = []
+            self._send_json({"models": models})
+            return
+
         if path == "/api/postprocess/steps":
             try:
                 self._send_json({"steps": ppmod.available_steps()})

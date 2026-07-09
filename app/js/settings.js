@@ -44,16 +44,24 @@ const GROUPS = [
     ['gen.height', 'Height', { type: 'number', step: '8' }],
     ['gen.ip_adapter', 'Use your reference images', { type: 'bool', hint: 'Off = ignore reference images, draw from your words only.' }],
     ['gen.ip_adapter_weight', 'How closely to follow your reference images', { type: 'range', min: '0', max: '1', step: '0.05', hint: 'Left = follow your words more. Right = copy your reference look more. Around the middle is usually best. Applies to new heroes.' }],
-    ['engine', 'Engine', { type: 'text' }],
-    ['comfyui.checkpoint', 'Model checkpoint', { type: 'text' }],
+    ['engine', 'Engine', { type: 'select', opts: [
+      { value: 'comfyui', label: 'ComfyUI (recommended)' },
+      { value: 'diffusers', label: 'Diffusers (simple fallback)' }] }],
+    ['comfyui.checkpoint', 'Art style engine (model)', { type: 'dynselect', source: 'checkpoints',
+      hint: 'Pick an installed model. Download more with the button below.' }],
   ]],
   ['Brain', [
-    ['brain', 'Brain', { type: 'select', opts: ['ollama', 'gemini'] }],
-    ['ollama_model', 'Ollama model', { type: 'text' }],
-    ['gemini_model', 'Gemini model', { type: 'text' }],
+    ['brain', 'Brain', { type: 'select', opts: [
+      { value: 'local', label: 'Local (Ollama, free)' },
+      { value: 'gemini_api', label: 'Google Gemini (needs a key)' },
+      { value: 'claude', label: 'Claude CLI' }] }],
+    ['ollama_model', 'Local model', { type: 'dynselect', source: 'ollama',
+      hint: 'Models you have pulled with Ollama.' }],
+    ['gemini_model', 'Gemini model', { type: 'select', opts: [
+      'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'] }],
   ]],
   ['Ranking', [
-    ['rank.clip_model', 'CLIP model', { type: 'text' }],
+    ['rank.clip_model', 'CLIP model', { type: 'select', opts: ['ViT-B-32', 'ViT-L-14', 'ViT-H-14'] }],
   ]],
   ['Vector', [
     ['vector.colors', 'Colors', { type: 'number', step: '1', hint: 'Palette size when tracing to vector.' }],
@@ -66,6 +74,37 @@ const GROUPS = [
 ];
 
 const ipt = 'width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:inherit;min-height:38px';
+
+// opts entries may be plain strings or { value, label }
+function optionsHtml(opts, val) {
+  return (opts || []).map((o) => {
+    const v = (o && typeof o === 'object') ? o.value : o;
+    const lab = (o && typeof o === 'object') ? o.label : o;
+    return `<option value="${esc(v)}" ${String(val) === String(v) ? 'selected' : ''}>${esc(lab)}</option>`;
+  }).join('');
+}
+
+// Fill the dynamic dropdowns (installed checkpoints / pulled local models) after
+// the panel renders, keeping the saved value selected even if it is not listed.
+async function populateDynSelects(box) {
+  const fill = (sel, names, cur) => {
+    if (!sel) { return; }
+    const list = names && names.length ? names.slice() : [];
+    if (cur && !list.includes(cur)) { list.unshift(cur); }
+    if (!list.length) { return; }  // leave the current value as-is
+    sel.innerHTML = list.map((n) => `<option value="${esc(n)}" ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('');
+  };
+  const ck = box.querySelector('[data-dyn="checkpoints"]');
+  if (ck) {
+    try { const d = await api.checkpoints(); fill(ck, d.installed || [], ck.dataset.cur || ck.value); }
+    catch (_) { /* keep current */ }
+  }
+  const ol = box.querySelector('[data-dyn="ollama"]');
+  if (ol) {
+    try { const d = await api.brainModels(); fill(ol, d.models || [], ol.dataset.cur || ol.value); }
+    catch (_) { /* keep current */ }
+  }
+}
 
 function fieldHtml(key, label, spec, val) {
   const id = 'set_' + key.replace(/\./g, '_');
@@ -83,8 +122,14 @@ function fieldHtml(key, label, spec, val) {
     return `<div class="col" style="gap:4px"><label for="${id}" class="faint">${esc(label)}</label>${control}${spec.hint ? `<div class="faint">${esc(spec.hint)}</div>` : ''}</div>`;
   }
   if (spec.type === 'select') {
-    const opts = (spec.opts || []).map((o) => `<option value="${esc(o)}" ${String(val) === o ? 'selected' : ''}>${esc(o)}</option>`).join('');
-    control = `<select id="${id}" data-key="${key}" style="${ipt}">${opts}</select>`;
+    control = `<select id="${id}" data-key="${key}" style="${ipt}">${optionsHtml(spec.opts, val)}</select>`;
+  } else if (spec.type === 'dynselect') {
+    // Rendered with just the current value; populated after mount from the server
+    // (installed checkpoints / pulled models) so it is a pick-list, not a text box.
+    const cur = val == null ? '' : String(val);
+    control = `<select id="${id}" data-key="${key}" data-dyn="${esc(spec.source)}" style="${ipt}">`
+      + (cur ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>` : '<option value="">loading...</option>')
+      + '</select>';
   } else {
     const t = spec.type === 'number' ? 'number' : 'text';
     control = `<input type="${t}" id="${id}" data-key="${key}" ${spec.step ? `step="${spec.step}"` : ''} value="${esc(val == null ? '' : val)}" style="${ipt}">`;
@@ -182,6 +227,7 @@ async function renderSettings() {
 
   box.querySelector('#setTutorial').onclick = () => { close(); emit('open', 'tutorial'); };
   box.querySelector('#btnCheckpoints').onclick = () => { emit('open', 'checkpoints'); };
+  populateDynSelects(box);
 
   renderFeaturePacks(box);
   renderVersion(box);
