@@ -445,7 +445,17 @@ if (Test-Path $configPath) {
                 $out.Add($line)
             }
         }
-        Set-Content -Path $configPath -Value $out -Encoding UTF8
+        # Safety: never overwrite a real config with an empty/degenerate one
+        # (a prior bug wrote a BOM-only 3-byte config.yaml). If the rebuilt
+        # content is suspiciously short, keep the backup and skip the write.
+        if ($out.Count -lt 5) {
+            Warn "Refusing to write a near-empty config.yaml (kept config.yaml.bak)."
+            if (Test-Path $backup) { Copy-Item $backup $configPath -Force }
+        } else {
+            # Write WITHOUT a BOM (UTF8Encoding($false)); a BOM has caused trouble
+            # for downstream readers of this file.
+            [System.IO.File]::WriteAllLines($configPath, $out, (New-Object System.Text.UTF8Encoding($false)))
+        }
         Ok "config.yaml wired:"
         Info "  comfyui.root = $rootForYaml"
         Info "  comfyui.exe  = $launcherForYaml"

@@ -121,7 +121,9 @@ def load_config(force_reload: bool = False) -> Dict[str, Any]:
     user_cfg: Dict[str, Any] = {}
     if os.path.isfile(_CONFIG_PATH):
         try:
-            with open(_CONFIG_PATH, "r", encoding="utf-8") as fh:
+            # utf-8-sig: transparently strips a BOM (PowerShell's Set-Content
+            # -Encoding UTF8 writes one) so it never leaks into the first key.
+            with open(_CONFIG_PATH, "r", encoding="utf-8-sig") as fh:
                 loaded = yaml.safe_load(fh)
             if isinstance(loaded, dict):
                 user_cfg = loaded

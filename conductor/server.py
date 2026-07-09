@@ -181,8 +181,14 @@ def _write_checkpoint(filename):
     """Set comfyui.checkpoint in config.yaml atomically and reload the cache."""
     import yaml
     cfg_path = cfg.resolve("config.yaml")
-    with open(cfg_path, "r", encoding="utf-8") as fh:
-        doc = yaml.safe_load(fh) or {}
+    raw = ""
+    if os.path.isfile(cfg_path):
+        with open(cfg_path, "r", encoding="utf-8-sig") as fh:  # tolerate a BOM
+            raw = fh.read()
+    doc = yaml.safe_load(raw) if raw.strip() else {}
+    if not isinstance(doc, dict):
+        # Never blow away a config that just failed to parse.
+        raise RuntimeError("config.yaml did not parse; refusing to overwrite it")
     doc.setdefault("comfyui", {})["checkpoint"] = filename
     tmp = cfg_path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as fh:
@@ -1504,8 +1510,18 @@ class Handler(BaseHTTPRequestHandler):
     def _save_settings(self, patch):
         import yaml  # config is yaml
         cfg_path = cfg.resolve("config.yaml")
-        with open(cfg_path, "r", encoding="utf-8") as fh:
-            doc = yaml.safe_load(fh) or {}
+        raw = ""
+        if os.path.isfile(cfg_path):
+            with open(cfg_path, "r", encoding="utf-8-sig") as fh:  # utf-8-sig: tolerate a BOM
+                raw = fh.read()
+        doc = yaml.safe_load(raw) if raw.strip() else {}
+        # Guard: if the file had real content but did not parse to a dict, do NOT
+        # proceed -- writing the patch alone would wipe every other key (this is
+        # how config.yaml once became a 3-byte stub). Fail loudly instead.
+        if not isinstance(doc, dict):
+            if raw.strip():
+                raise RuntimeError("config.yaml did not parse; refusing to overwrite it")
+            doc = {}
         for key, val in patch.items():
             if key not in self._SETTING_KEYS:
                 continue
@@ -1515,7 +1531,7 @@ class Handler(BaseHTTPRequestHandler):
                 node = node.setdefault(p, {})
             node[parts[-1]] = val
         tmp = cfg_path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as fh:
+        with open(tmp, "w", encoding="utf-8") as fh:  # no BOM
             yaml.safe_dump(doc, fh, sort_keys=False, allow_unicode=True)
         os.replace(tmp, cfg_path)
         cfg.load_config(force_reload=True)

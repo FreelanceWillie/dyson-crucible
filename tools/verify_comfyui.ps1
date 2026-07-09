@@ -63,12 +63,15 @@ function Set-ComfyConfig($configPath, $root, $launcher) {
     $rootY = ($root -replace '\\', '/')
     $exeY  = ($launcher -replace '\\', '/')
     $out = New-Object System.Collections.Generic.List[string]
-    foreach ($line in (Get-Content $configPath)) {
+    $src = Get-Content $configPath
+    foreach ($line in $src) {
         if ($line -match '^(\s*)root:\s*".*"') { $out.Add($Matches[1] + 'root: "' + $rootY + '"          # set by verify') }
         elseif ($line -match '^(\s*)exe:\s*".*"') { $out.Add($Matches[1] + 'exe: "' + $exeY + '"                # set by verify') }
         else { $out.Add($line) }
     }
-    Set-Content -Path $configPath -Value $out -Encoding UTF8
+    # Never clobber a real config with an empty/degenerate one. Write without a BOM.
+    if ($out.Count -lt 5) { return }
+    [System.IO.File]::WriteAllLines($configPath, $out, (New-Object System.Text.UTF8Encoding($false)))
 }
 
 # Launch ComfyUI via the launcher, poll its API, then stop it. Returns $true if it
