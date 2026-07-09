@@ -90,7 +90,11 @@ Write-Host "[4/8] Installing Python dependencies..." -ForegroundColor Yellow
 # CUDA install above did not take (or a transitive dep resolved a plain PyPI
 # torch), the venv can end up with a CPU-only torch and ComfyUI dies with
 # "Torch not compiled with CUDA enabled". On a machine that HAS an NVIDIA GPU,
-# detect that and force-reinstall the matched CUDA stack from the cu121 index.
+# detect that and force-reinstall the matched CUDA stack. We do NOT hardcode one
+# CUDA index: cu121 only ships wheels up to ~Python 3.12, so a newer Python
+# (3.13/3.14) finds "no matching distribution" there and needs a newer index
+# (cu126/cu128). Try them in order until one yields a CUDA torch.
+$CudaIndexes = @("cu121", "cu124", "cu126", "cu128")
 Write-Host ""
 Write-Host "[4b/8] Verifying torch is the CUDA build..." -ForegroundColor Yellow
 $hasGpu = $false
@@ -99,10 +103,17 @@ if ($hasGpu) {
     $torchKind = (& $venvPy -c "import torch,sys; sys.stdout.write('cuda' if torch.version.cuda else 'cpu')" 2>$null)
     if ($torchKind -ne "cuda") {
         Write-Host "      torch is a CPU build ($torchKind) but you have an NVIDIA GPU. Reinstalling the CUDA build..." -ForegroundColor Yellow
-        & $venvPy -m pip install --force-reinstall torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-        $torchKind = (& $venvPy -c "import torch,sys; sys.stdout.write('cuda' if torch.version.cuda else 'cpu')" 2>$null)
-        if ($torchKind -eq "cuda") { Write-Host "      torch CUDA build restored." -ForegroundColor Green }
-        else { Write-Host "      Still not a CUDA torch. ComfyUI will fail on GPU; check the pip output above." -ForegroundColor Red }
+        $healed = $false
+        foreach ($idx in $CudaIndexes) {
+            Write-Host "      trying the $idx wheels..." -ForegroundColor DarkYellow
+            & $venvPy -m pip install --force-reinstall torch torchvision torchaudio --index-url "https://download.pytorch.org/whl/$idx" 2>$null
+            $torchKind = (& $venvPy -c "import torch,sys; sys.stdout.write('cuda' if torch.version.cuda else 'cpu')" 2>$null)
+            if ($torchKind -eq "cuda") { $healed = $true; Write-Host "      torch CUDA build restored via $idx." -ForegroundColor Green; break }
+        }
+        if (-not $healed) {
+            Write-Host "      Could not find a CUDA torch wheel for this Python ($((& $venvPy -c 'import sys;print(\"%d.%d\"%sys.version_info[:2])'))). " -ForegroundColor Red
+            Write-Host "      Newest PyTorch CUDA wheels lag the newest Python; a .venv on Python 3.11-3.12 is the safe target." -ForegroundColor Red
+        }
     } else {
         Write-Host "      torch has CUDA. Good." -ForegroundColor Green
     }
