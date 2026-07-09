@@ -35,11 +35,19 @@ if not exist ".venv\Scripts\python.exe" (
 echo.
 echo   Starting Dyson Crucible... your browser will open in a moment.
 echo   Keep this black window open while you use the app.
-echo   Close it to stop the app.
+echo   Close it to stop the app. (Do not click inside it.)
 echo.
+REM Stop any previous copy still holding the port. A leftover/wedged server
+REM would make the new one fail to start and the browser show a blank page.
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { $_.CommandLine -like '*conductor*server.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>&1
 REM open the browser a few seconds later, once the server is up
-start "" cmd /c "ping -n 6 127.0.0.1 >nul & start "" http://127.0.0.1:7860"
-".venv\Scripts\python.exe" conductor\server.py
+start "" cmd /c "ping -n 9 127.0.0.1 >nul & start "" http://127.0.0.1:7860"
+REM Send the server's output to a log file, NOT this console. Writing to the
+REM console can freeze the app if you click inside this window (Windows
+REM "QuickEdit" pauses a program until you press a key) -- which looks exactly
+REM like a blank / broken page. Logging to a file avoids that completely.
+if not exist "logs" mkdir "logs"
+".venv\Scripts\python.exe" conductor\server.py > "logs\server.log" 2>&1
 echo.
-echo   The app has stopped. You can close this window.
+echo   The app has stopped. Details are in  logs\server.log
 pause
