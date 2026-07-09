@@ -75,6 +75,8 @@ DEFAULTS: Dict[str, Any] = {
         "workflow": "workflows/sd15_ipadapter.json",
         "checkpoint": "v1-5-pruned-emaonly.safetensors",
         "ip_adapter_preset": "PLUS",
+        "warm_on_boot": True,  # start ComfyUI in the background at app launch so the
+                               # first generation is instant (Reclaim frees it anytime)
     },
     "gen": {
         "base_model": "runwayml/stable-diffusion-v1-5",

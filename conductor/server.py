@@ -1628,6 +1628,7 @@ class Handler(BaseHTTPRequestHandler):
         "brain", "ollama_model", "gemini_model",
         "gen.n_candidates", "gen.steps", "gen.cfg", "gen.width", "gen.height",
         "gen.ip_adapter", "gen.ip_adapter_weight", "engine", "comfyui.checkpoint",
+        "comfyui.warm_on_boot",
         "rank.clip_model", "vector.colors",
         "queue.max_retries", "queue.poll_seconds", "queue.restart_engine_on_fail",
     ]
@@ -1939,6 +1940,39 @@ def _start_worker():
     return stop_flag, t
 
 
+def _warm_engine():
+    """Start ComfyUI in the background at boot (comfyui.warm_on_boot) so the first
+    generation is instant instead of paying a ~1-2 min cold start. Non-blocking:
+    the server serves immediately while the engine warms, the pill shows
+    'warming up', and Reclaim machine frees the GPU whenever the user wants it back.
+    Skips if the queue is paused (the user has explicitly asked for the machine)."""
+    try:
+        conf = cfg.load_config()
+        comfy = conf.get("comfyui", {}) or {}
+        if (conf.get("engine") or "comfyui") != "comfyui":
+            return
+        if not comfy.get("warm_on_boot", True):
+            return
+        if not (comfy.get("exe") or "").strip():
+            return
+        if jobs.is_paused():
+            return
+
+        def _run():
+            try:
+                import comfyui as _cf  # type: ignore
+                if _cf.is_up(comfy.get("url", "http://127.0.0.1:8188")):
+                    return
+                print("[warm] pre-starting ComfyUI so the first generation is instant...")
+                _cf.ensure_up(conf)
+            except Exception as exc:  # never fatal
+                print("[warm] engine pre-start skipped: %s" % exc)
+
+        threading.Thread(target=_run, name="engine-warm", daemon=True).start()
+    except Exception:
+        pass
+
+
 def _startup_selfcheck():
     """Print a one-glance health summary at boot so problems are obvious in the
     console immediately -- not only after the first failed generation."""
@@ -1970,6 +2004,7 @@ def serve(port=None):
         port = int(os.environ.get("CONDUCTOR_PORT", "7860"))
     _start_worker()
     _startup_selfcheck()
+    _warm_engine()
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     url = "http://127.0.0.1:{0}/".format(port)
     print("Dyson Crucible dashboard running at " + url)

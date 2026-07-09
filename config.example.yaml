@@ -52,6 +52,8 @@ comfyui:
                                     # fetches it (and falls back to v1-5-pruned-emaonly if
                                     # that download fails, rewriting this line to match).
   ip_adapter_preset: PLUS           # IP-Adapter preset node value
+  warm_on_boot: true                # start ComfyUI in the background at app launch so
+                                    # the first generation is instant. Reclaim frees it.
 
 # --- Model Manager (models.py): search + install LoRAs/ControlNets from Civitai ---
 models:

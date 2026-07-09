@@ -49,6 +49,8 @@ const GROUPS = [
       { value: 'diffusers', label: 'Diffusers (simple fallback)' }] }],
     ['comfyui.checkpoint', 'Art style engine (model)', { type: 'dynselect', source: 'checkpoints',
       hint: 'Pick an installed model. Download more with the button below.' }],
+    ['comfyui.warm_on_boot', 'Warm up the engine at startup', { type: 'bool',
+      hint: 'Start ComfyUI when the app opens so your first image is instant. Reclaim machine frees the GPU anytime.' }],
   ]],
   ['Brain', [
     ['brain', 'Brain', { type: 'select', opts: [
