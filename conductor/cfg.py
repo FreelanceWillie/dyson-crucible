@@ -32,6 +32,22 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Path to the config file we read (kept as a module constant for clarity).
 _CONFIG_PATH = os.path.join(REPO_ROOT, "config.yaml")
+_CONFIG_EXAMPLE = os.path.join(REPO_ROOT, "config.example.yaml")
+
+
+def _ensure_config() -> None:
+    """Provision a per-machine config.yaml from the tracked config.example.yaml on
+    first run. config.yaml is gitignored (it holds machine paths + the user's
+    choices), so a fresh clone has only the example; copy it once so edits, the
+    installer, and the settings UI have a real file to work with."""
+    if os.path.isfile(_CONFIG_PATH):
+        return
+    try:
+        if os.path.isfile(_CONFIG_EXAMPLE):
+            import shutil
+            shutil.copyfile(_CONFIG_EXAMPLE, _CONFIG_PATH)
+    except Exception as exc:  # never fatal: DEFAULTS still apply
+        print(f"[cfg] could not create config.yaml from example ({exc})")
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +134,7 @@ def load_config(force_reload: bool = False) -> Dict[str, Any]:
     if _CACHE is not None and not force_reload:
         return _CACHE
 
+    _ensure_config()  # provision config.yaml from the example on first run
     user_cfg: Dict[str, Any] = {}
     if os.path.isfile(_CONFIG_PATH):
         try:

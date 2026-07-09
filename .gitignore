@@ -26,3 +26,6 @@ references/**/*
 
 # --- Keep folder markers ---
 !.gitkeep
+
+# --- Per-machine config (generated from config.example.yaml on first run) ---
+config.yaml

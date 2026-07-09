@@ -391,6 +391,13 @@ Get-File $UrlClipVision $ClipVisionFile "CLIP-vision image encoder" | Out-Null
 # =====================================================================
 Step 9 "Wiring config.yaml (comfyui.root + comfyui.exe)..."
 $configPath = Join-Path $RepoRoot "config.yaml"
+# config.yaml is per-machine + gitignored; create it from the tracked template on
+# a fresh clone so there is something to wire.
+$configExample = Join-Path $RepoRoot "config.example.yaml"
+if ((-not (Test-Path $configPath)) -and (Test-Path $configExample)) {
+    Copy-Item $configExample $configPath -Force
+    Ok "Created config.yaml from config.example.yaml."
+}
 
 # The launcher we point comfyui.exe at. Portable builds ship run_nvidia_gpu.bat
 # at the ComfyUI root. Prefer whichever launcher actually exists.
