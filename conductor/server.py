@@ -1706,12 +1706,19 @@ class Handler(BaseHTTPRequestHandler):
         add("Style references", has_refs, "found images" if has_refs else "none yet",
             "Drop 8 to 20 style images in references/default/.")
         # python deps
+        import importlib.util as _ilu
         for mod, why in [("open_clip", "candidate ranking"), ("vtracer", "vectorizing"),
                          ("rembg", "transparent sprites (bg remove)"), ("psutil", "resource meters")]:
+            # find_spec only checks the package is importable; it does NOT execute it,
+            # so a heavy dep (open_clip pulls torch) does not make the Doctor slow, and
+            # a transient torch hiccup cannot make an installed package read as missing.
             try:
-                __import__(mod)
-                add("Python: " + mod, True, "installed (" + why + ")", "")
+                present = _ilu.find_spec(mod) is not None
             except Exception:
+                present = False
+            if present:
+                add("Python: " + mod, True, "installed (" + why + ")", "")
+            else:
                 add("Python: " + mod, False, "missing (" + why + ")", "Run setup.ps1 again.")
         # LayerDiffuse (native transparent gen) readiness: node + models present.
         try:
