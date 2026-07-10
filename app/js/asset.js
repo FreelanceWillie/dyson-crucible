@@ -4,7 +4,7 @@
 // reference-image drop area used to steer blend gens. Renders on 'select' and on
 // 'view' === 'asset'; re-fetches candidates live when a job for this asset finishes.
 import { api } from './api.js';
-import { state, on, emit, toast, refreshState, selectAsset, setView } from './state.js';
+import { state, on, emit, toast, refreshState, selectAsset, setView, confirmModal } from './state.js';
 
 const el = () => document.getElementById('main');
 
@@ -258,10 +258,21 @@ function briefBlock() {
   box.style.marginTop = '12px';
   box.appendChild(Object.assign(document.createElement('div'), { className: 'h', textContent: 'Brief' }));
 
-  const p = document.createElement('div');
-  p.className = 'muted';
-  p.textContent = prompt || 'No prompt yet. Talk to this hero to shape it.';
+  // Editable prompt: revise the words here, then Generate for a new batch (you do
+  // not have to pick a winner to iterate).
+  const p = document.createElement('textarea');
+  p.id = 'briefPrompt';
+  p.rows = 2;
+  p.value = prompt;
+  p.dataset.orig = prompt;
+  p.placeholder = 'Describe this hero. Edit the words and press Generate to revise.';
+  p.style.cssText = 'width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:inherit;font:inherit;resize:vertical;min-height:44px';
   box.appendChild(p);
+  const hint = document.createElement('div');
+  hint.className = 'faint';
+  hint.style.marginTop = '4px';
+  hint.textContent = 'Edit the words above, then Generate to make a fresh batch. No need to pick a winner first.';
+  box.appendChild(hint);
 
   const chips = document.createElement('div');
   chips.className = 'row';
@@ -420,12 +431,34 @@ function galleryBlock() {
 
 function doGen() {
   const eng = (state.resources && state.resources.engine && state.resources.engine.state) || 'off';
-  api.gen(state.current)
+  // If the prompt was edited in the brief box, save the revision before generating,
+  // so "change the words, hit Generate" is one iterative loop (no winner required).
+  const pEl = document.getElementById('briefPrompt');
+  const orig = pEl ? (pEl.dataset.orig || '') : null;
+  const cur = pEl ? pEl.value.trim() : null;
+  const save = (pEl && cur !== orig) ? api.updateBrief(state.current, { prompt: cur }) : Promise.resolve();
+  save
+    .then(() => { if (pEl) { pEl.dataset.orig = cur; } })
+    .then(() => api.gen(state.current))
     .then(() => {
-      if (eng === 'ready') { toast('Generating your images...', 'good'); }
+      if (eng === 'ready') { toast('Generating a new batch...', 'good'); }
       else { toast('Queued. The engine is warming up. Your batch starts automatically when it is ready (first run takes 1-2 min).', 'good'); }
     })
     .catch((e) => toast('Could not generate: ' + e.message, 'bad'));
+}
+
+function doDelete() {
+  const name = state.current;
+  confirmModal({
+    title: 'Delete this hero?', danger: true, confirmLabel: 'Delete',
+    body: 'This removes "' + name + '" and all its images. This cannot be undone.',
+  }).then((ok) => {
+    if (!ok) { return; }
+    api.deleteAsset(name)
+      .then(() => { toast('Deleted ' + name); return refreshState(); })
+      .then(() => setView('home'))
+      .catch((e) => toast('Could not delete: ' + e.message, 'bad'));
+  });
 }
 
 function doPick(url, i) {
@@ -499,6 +532,11 @@ function render() {
   catWrap.appendChild(document.createTextNode('Category'));
   catWrap.appendChild(buildCategorySelect(category));
   actions.appendChild(catWrap);
+  const spacer = document.createElement('span'); spacer.style.flex = '1'; actions.appendChild(spacer);
+  const del = document.createElement('button');
+  del.className = 'btn sm ghost bad'; del.textContent = 'Delete hero';
+  del.onclick = doDelete;
+  actions.appendChild(del);
   head.appendChild(actions);
 
   head.appendChild(briefBlock());

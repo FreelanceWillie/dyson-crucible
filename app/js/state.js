@@ -84,6 +84,30 @@ export function showImage(url, caption) {
   const x = m.querySelector('#img-x'); if (x) { x.onclick = close; }
 }
 
+// Yes/no confirmation in the shared #modal. Resolves true on confirm, false otherwise.
+export function confirmModal({ title, body, confirmLabel, danger }) {
+  return new Promise((resolve) => {
+    const m = document.getElementById('modal');
+    if (!m) { resolve(false); return; }
+    m.classList.add('open');
+    m.innerHTML = `<div class="box"><div class="hd row"><b>${_esc(title || 'Are you sure?')}</b><span style="flex:1"></span>`
+      + `<button class="btn sm ghost" id="cf-x">&#10005;</button></div>`
+      + `<div class="bd col" style="gap:14px">`
+      + (body ? `<div class="faint">${_esc(body)}</div>` : '')
+      + `<div class="row" style="gap:8px;justify-content:flex-end">`
+      + `<button class="btn sm ghost" id="cf-no">Cancel</button>`
+      + `<button class="btn sm ${danger ? 'bad' : 'primary'}" id="cf-yes">${_esc(confirmLabel || 'Confirm')}</button>`
+      + `</div></div></div>`;
+    const done = (val) => { m.classList.remove('open'); m.innerHTML = ''; document.removeEventListener('keydown', key); resolve(val); };
+    const key = (e) => { if (e.key === 'Escape') { done(false); } };
+    document.addEventListener('keydown', key);
+    m.onclick = (e) => { if (e.target === m) { done(false); } };
+    m.querySelector('#cf-x').onclick = () => done(false);
+    m.querySelector('#cf-no').onclick = () => done(false);
+    m.querySelector('#cf-yes').onclick = () => done(true);
+  });
+}
+
 // toast helper (used everywhere)
 export function toast(msg, kind) {
   const wrap = document.getElementById('toasts');

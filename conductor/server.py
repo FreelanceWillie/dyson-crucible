@@ -990,6 +990,38 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"ok": True, "job": job_id})
             return
 
+        if path == "/api/brief/update":
+            # Edit the hero's prompt / negative directly (revise, then Generate again).
+            name = (data.get("name") or "").strip()
+            if not name or not briefmod.exists(name, paths["briefs"]):
+                self._send_json({"error": "no such asset: " + name}, 404); return
+            b = briefmod.load(name, paths["briefs"])
+            if "prompt" in data:
+                b["prompt"] = str(data.get("prompt") or "")
+            if "negative" in data:
+                b["negative"] = str(data.get("negative") or "")
+            briefmod.save(name, b, paths["briefs"])
+            self._send_json({"ok": True, "brief": b})
+            return
+
+        if path == "/api/asset/delete":
+            # Remove a hero entirely: its brief, outputs, and any vectors.
+            name = (data.get("name") or "").strip()
+            if not name or not briefmod.exists(name, paths["briefs"]):
+                self._send_json({"error": "no such asset: " + name}, 404); return
+            for d in (os.path.join(paths["briefs"], name),
+                      os.path.join(paths["outputs"], name),
+                      os.path.join(paths["vectors"], name)):
+                shutil.rmtree(d, ignore_errors=True)
+            try:
+                svg = os.path.join(paths["vectors"], name + ".svg")
+                if os.path.isfile(svg):
+                    os.remove(svg)
+            except OSError:
+                pass
+            self._send_json({"ok": True, "deleted": name})
+            return
+
         if path == "/api/pick":
             name = (data.get("name") or "").strip()
             candidate = (data.get("candidate") or "").strip()
