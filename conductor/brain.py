@@ -902,7 +902,13 @@ def recommend_checkpoint(description, catalog, cfg):
     low = (description or "").lower()
     syn = {"cartoon": "toon", "anime": "stylized", "photo": "realistic", "photoreal": "realistic",
            "portrait": "portraits", "face": "portraits", "rpg": "rpg", "game": "game",
-           "sprite": "2d", "mascot": "toon", "creature": "characters", "monster": "characters"}
+           "sprite": "2d", "mascot": "toon", "creature": "characters", "monster": "characters",
+           # items / props / objects (NOT people)
+           "item": "items", "items": "items", "prop": "props", "props": "props",
+           "object": "objects", "objects": "objects", "icon": "icons", "weapon": "weapons",
+           "sword": "weapons", "axe": "weapons", "shield": "items", "potion": "items",
+           "gear": "items", "equipment": "items", "loot": "items", "treasure": "items",
+           "chest": "items", "armor": "items", "food": "items", "gem": "items", "tool": "items"}
     for k, v in syn.items():
         if k in low:
             low += " " + v

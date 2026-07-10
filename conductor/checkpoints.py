@@ -72,6 +72,15 @@ CATALOG: List[Dict[str, Any]] = [
         "url": "https://huggingface.co/digiplay/majicMIX_realistic_v7/resolve/main/majicmixRealistic_v7.safetensors",
         "size_mb": 2034,
     },
+    {
+        "id": "gameicons3d",
+        "name": "Game Icons 3D",
+        "best_for": "Items, props, weapons, potions, and icons on clean backgrounds. Objects, not people.",
+        "tags": ["Items", "Props", "Icons", "Objects", "Weapons"],
+        "filename": "GameIcons3D.safetensors",
+        "url": "https://huggingface.co/Yntec/GameIcons3D/resolve/main/GameIcons3D.safetensors",
+        "size_mb": 4067,  # full precision (~4GB); runs on a 4GB card via --lowvram
+    },
 ]
 
 _BY_ID = {c["id"]: c for c in CATALOG}
