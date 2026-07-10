@@ -29,3 +29,6 @@ references/**/*
 
 # --- Per-machine config (generated from config.example.yaml on first run) ---
 config.yaml
+
+# --- Per-project data workspaces (created at runtime) ---
+projects/

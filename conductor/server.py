@@ -209,13 +209,16 @@ def _root_for(key, default):
         return os.path.join(REPO_ROOT, default)
 
 
-# Static roots that are safe to serve, keyed by the URL prefix.
-_STATIC_ROOTS = {
-    "/app": APP_DIR,
-    "/outputs": _root_for("outputs", "outputs"),
-    "/vectors": _root_for("vectors", "vectors"),
-    "/references": _root_for("references", "references"),
-}
+# Static roots. /app is fixed; the data roots are resolved LIVE per request via
+# cfg.path so they follow the active project (see _serve_static).
+_DATA_URL_KEYS = {"/outputs": "outputs", "/vectors": "vectors", "/references": "references"}
+
+
+def _static_root(prefix):
+    if prefix == "/app":
+        return APP_DIR
+    key = _DATA_URL_KEYS.get(prefix)
+    return _root_for(key, key) if key else None
 
 
 # ---------------------------------------------------------------------------
@@ -226,19 +229,12 @@ def _cfg():
 
 
 def _paths(conf):
-    p = conf.get("paths", {}) or {}
-
-    def _abs(key, default):
-        val = p.get(key, default)
-        if not os.path.isabs(val):
-            val = os.path.join(REPO_ROOT, val)
-        return val
-
+    # Project-scoped: cfg.path resolves these under the active project.
     return {
-        "references": _abs("references", "references"),
-        "briefs": _abs("briefs", "briefs"),
-        "outputs": _abs("outputs", "outputs"),
-        "vectors": _abs("vectors", "vectors"),
+        "references": cfg.path("references"),
+        "briefs": cfg.path("briefs"),
+        "outputs": cfg.path("outputs"),
+        "vectors": cfg.path("vectors"),
     }
 
 
@@ -339,8 +335,11 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- static serving -----------------------------------------------------
     def _serve_static(self, url_path):
-        for prefix, root in _STATIC_ROOTS.items():
+        for prefix in ("/app", "/outputs", "/vectors", "/references"):
             if url_path == prefix or url_path.startswith(prefix + "/"):
+                root = _static_root(prefix)  # resolved live -> follows the active project
+                if not root:
+                    return False
                 rel = url_path[len(prefix):].lstrip("/")
                 fp = os.path.normpath(os.path.join(root, rel))
                 # Path-traversal guard.
@@ -585,6 +584,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(exc)}, 500)
             return
 
+        if path == "/api/projects":
+            self._send_json({"projects": cfg.list_projects(), "active": cfg.active_project()})
+            return
+
         if path == "/api/brain/models":
             # Installed local (Ollama) models, so Settings can offer a dropdown
             # instead of a free-text box. Empty list if Ollama is not reachable.
@@ -736,6 +739,28 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"ok": True, "already": True}); return
             threading.Thread(target=_cap_install_bg, args=(group, conf), daemon=True).start()
             self._send_json({"ok": True, "started": group})
+            return
+
+        if path.startswith("/api/project/"):
+            op = path[len("/api/project/"):]
+            name = (data.get("name") or "").strip()
+            try:
+                if op == "new":
+                    if not name:
+                        self._send_json({"error": "name required"}, 400); return
+                    cfg.set_active_project(name)  # create + switch to it
+                elif op == "switch":
+                    if not name:
+                        self._send_json({"error": "name required"}, 400); return
+                    cfg.set_active_project(name)
+                elif op == "delete":
+                    if not cfg.delete_project(name):
+                        self._send_json({"error": "cannot delete that project"}, 400); return
+                else:
+                    self._send_json({"error": "unknown project op: " + op}, 404); return
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500); return
+            self._send_json({"ok": True, "projects": cfg.list_projects(), "active": cfg.active_project()})
             return
 
         if path == "/api/checkpoints/install":
@@ -2001,6 +2026,8 @@ class Handler(BaseHTTPRequestHandler):
             "assets": assets,
             "queue": self._jobs_list(),
             "brain": brain_info,
+            "project": cfg.active_project(),
+            "projects": cfg.list_projects(),
         }
 
 

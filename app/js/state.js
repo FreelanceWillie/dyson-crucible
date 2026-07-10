@@ -15,6 +15,8 @@ export const state = {
   brain: { name: '', ok: false, detail: '' },
   queue: [],
   resources: null,
+  project: 'default',   // active project (top layer above categories/heroes)
+  projects: [],
   current: null,        // selected asset name
   currentCategory: null, // selected category path
   online: true,
@@ -126,6 +128,8 @@ export async function refreshState() {
     state.assets = s.assets || [];
     state.brain = s.brain || state.brain;
     state.tree = cats.tree || [];
+    state.project = s.project || state.project || 'default';
+    state.projects = s.projects || state.projects || [];
     state.queuePaused = !!s.queue_paused;
     state.online = true;
     emit('state', state);

@@ -217,8 +217,19 @@ function render() {
   (function walk(ns) { ns.forEach((n) => { knownPaths.add(n.path); walk(n.children || []); }); })(tree);
   const orphans = assets.filter((a) => !a.category || !knownPaths.has(a.category));
 
+  const projects = state.projects || [];
+  const active = state.project || 'default';
+  const projOpts = projects.map((p) => `<option value="${esc(p)}" ${p === active ? 'selected' : ''}>${esc(p)}</option>`).join('');
+
   r.innerHTML = `
     <div class="col" style="gap:10px">
+      <div class="col" style="gap:4px">
+        <span class="faint" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em">Project</span>
+        <div class="row" style="gap:6px;align-items:center">
+          <select id="rail-project" class="in" style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:inherit">${projOpts}</select>
+          <button class="btn sm ghost" id="rail-newproj" title="New project">+</button>
+        </div>
+      </div>
       <button class="btn primary" id="rail-newhero">&#127917; New hero</button>
       <div class="row" style="gap:6px;align-items:center">
         <span class="h" style="flex:1;margin:0">Categories</span>
@@ -229,6 +240,26 @@ function render() {
 
   r.querySelector('#rail-newhero').onclick = newHero;
   r.querySelector('#rail-newcat').onclick = () => addSub(null);
+  const projSel = r.querySelector('#rail-project');
+  if (projSel) {
+    projSel.onchange = () => {
+      api.projectSwitch(projSel.value)
+        .then(() => { state.current = null; state.currentCategory = null; toast('Switched to ' + projSel.value); return refreshState(); })
+        .then(() => setView('home'))
+        .catch((e) => toast('Could not switch project: ' + e.message, 'bad'));
+    };
+  }
+  r.querySelector('#rail-newproj').onclick = async () => {
+    const vals = await askModal({
+      title: 'New project', submitLabel: 'Create project',
+      fields: [{ label: 'Project name', placeholder: 'e.g. Slay Clone, Card Game 2', required: true }],
+    });
+    if (!vals || !vals[0]) { return; }
+    api.projectNew(vals[0])
+      .then(() => { state.current = null; state.currentCategory = null; toast('Created ' + vals[0]); return refreshState(); })
+      .then(() => setView('home'))
+      .catch((e) => toast('Could not create project: ' + e.message, 'bad'));
+  };
 
   const host = r.querySelector('#rail-tree');
   if (!tree.length && !orphans.length) {

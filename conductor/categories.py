@@ -57,7 +57,12 @@ def _repo_root() -> str:
 
 
 def _cats_path() -> str:
-    return os.path.join(_repo_root(), "categories.yaml")
+    # Per-project: categories live in the active project's workspace.
+    try:
+        from cfg import project_file  # type: ignore
+        return project_file("categories.yaml")
+    except Exception:
+        return os.path.join(_repo_root(), "categories.yaml")
 
 
 def _references_root() -> str:

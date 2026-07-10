@@ -268,10 +268,24 @@ function briefBlock() {
   p.placeholder = 'Describe this hero. Edit the words and press Generate to revise.';
   p.style.cssText = 'width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:inherit;font:inherit;resize:vertical;min-height:44px';
   box.appendChild(p);
+  // Exclude field (negative prompt): what to keep OUT of the image.
+  const nLabel = document.createElement('div');
+  nLabel.className = 'faint';
+  nLabel.style.cssText = 'margin-top:8px;font-size:12px';
+  nLabel.textContent = 'Exclude (leave these out)';
+  box.appendChild(nLabel);
+  const n = document.createElement('textarea');
+  n.id = 'briefNegative';
+  n.rows = 1;
+  n.value = negative;
+  n.dataset.orig = negative;
+  n.placeholder = 'e.g. people, text, numbers, HUD, watermark';
+  n.style.cssText = 'width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:inherit;font:inherit;resize:vertical;min-height:36px';
+  box.appendChild(n);
   const hint = document.createElement('div');
   hint.className = 'faint';
   hint.style.marginTop = '4px';
-  hint.textContent = 'Edit the words above, then Generate to make a fresh batch. No need to pick a winner first.';
+  hint.textContent = 'Edit the prompt or exclude list, then Generate for a fresh batch. No need to pick a winner first.';
   box.appendChild(hint);
 
   const chips = document.createElement('div');
@@ -279,7 +293,6 @@ function briefBlock() {
   chips.style.marginTop = '8px';
   const chip = (label, val) => `<span class="chip">${esc(label)}: ${esc(val)}</span>`;
   const parts = [];
-  if (negative) { parts.push(chip('Negative', negative)); }
   parts.push(chip('Category', category || 'Uncategorized'));
   if (ip != null) { parts.push(chip('IP weight', ip)); }
   chips.innerHTML = parts.join('');
@@ -434,11 +447,15 @@ function doGen() {
   // If the prompt was edited in the brief box, save the revision before generating,
   // so "change the words, hit Generate" is one iterative loop (no winner required).
   const pEl = document.getElementById('briefPrompt');
-  const orig = pEl ? (pEl.dataset.orig || '') : null;
+  const nEl = document.getElementById('briefNegative');
   const cur = pEl ? pEl.value.trim() : null;
-  const save = (pEl && cur !== orig) ? api.updateBrief(state.current, { prompt: cur }) : Promise.resolve();
+  const curN = nEl ? nEl.value.trim() : null;
+  const patch = {};
+  if (pEl && cur !== (pEl.dataset.orig || '')) { patch.prompt = cur; }
+  if (nEl && curN !== (nEl.dataset.orig || '')) { patch.negative = curN; }
+  const save = Object.keys(patch).length ? api.updateBrief(state.current, patch) : Promise.resolve();
   save
-    .then(() => { if (pEl) { pEl.dataset.orig = cur; } })
+    .then(() => { if (pEl) { pEl.dataset.orig = cur; } if (nEl) { nEl.dataset.orig = curN; } })
     .then(() => api.gen(state.current))
     .then(() => {
       if (eng === 'ready') { toast('Generating a new batch...', 'good'); }

@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import copy
 import os
-from typing import Any, Dict
+import re
+import shutil
+from typing import Any, Dict, List
 
 try:
     import yaml
@@ -159,14 +161,106 @@ def resolve(*parts: str) -> str:
     return os.path.abspath(os.path.join(REPO_ROOT, *parts))
 
 
-def path(key: str) -> str:
-    """Absolute path of cfg['paths'][key] under REPO_ROOT.
+# ---------------------------------------------------------------------------
+# Projects: the top layer above categories + heroes. Each project is a fully
+# isolated data workspace under projects/<name>/ (its own briefs, outputs,
+# references, vectors, and categories.yaml). Models/engine/gen settings in
+# config.yaml stay GLOBAL and shared across projects.
+# ---------------------------------------------------------------------------
+PROJECTS_DIR = os.path.join(REPO_ROOT, "projects")
+_ACTIVE_FILE = os.path.join(PROJECTS_DIR, "_active.txt")
+_DATA_KEYS = {"references", "briefs", "outputs", "vectors"}  # per-project data
 
-    e.g. path('outputs') -> <repo>/outputs. Falls back to DEFAULTS['paths']
-    (and finally to the key name itself) so an unknown/missing key never
-    crashes the caller.
+
+def _safe_project(name: str) -> str:
+    return (re.sub(r"[^A-Za-z0-9 _-]", "", (name or "")).strip()) or "default"
+
+
+def _ensure_projects() -> None:
+    """Create projects/default and, on first run, migrate any legacy top-level
+    data (briefs/outputs/references/vectors/categories.yaml) into it."""
+    default = os.path.join(PROJECTS_DIR, "default")
+    if os.path.isdir(default):
+        return
+    os.makedirs(default, exist_ok=True)
+    for item in ("briefs", "outputs", "references", "vectors", "categories.yaml"):
+        src = os.path.join(REPO_ROOT, item)
+        dst = os.path.join(default, item)
+        if os.path.exists(src) and not os.path.exists(dst):
+            try:
+                shutil.move(src, dst)
+            except Exception as exc:  # pragma: no cover - never fatal
+                print(f"[cfg] project migration: could not move {item} ({exc})")
+    for k in _DATA_KEYS:
+        os.makedirs(os.path.join(default, k), exist_ok=True)
+
+
+def active_project() -> str:
+    try:
+        with open(_ACTIVE_FILE, "r", encoding="utf-8") as fh:
+            n = _safe_project(fh.read())
+    except Exception:
+        n = "default"
+    # If the recorded project no longer exists, fall back to default.
+    if not os.path.isdir(os.path.join(PROJECTS_DIR, n)):
+        return "default"
+    return n
+
+
+def set_active_project(name: str) -> str:
+    name = _safe_project(name)
+    create_project(name)
+    with open(_ACTIVE_FILE, "w", encoding="utf-8") as fh:
+        fh.write(name)
+    return name
+
+
+def create_project(name: str) -> str:
+    name = _safe_project(name)
+    for k in _DATA_KEYS:
+        os.makedirs(os.path.join(PROJECTS_DIR, name, k), exist_ok=True)
+    return name
+
+
+def delete_project(name: str) -> bool:
+    name = _safe_project(name)
+    if name == "default":
+        return False  # keep at least the default workspace
+    shutil.rmtree(os.path.join(PROJECTS_DIR, name), ignore_errors=True)
+    if active_project() == name:
+        set_active_project("default")
+    return True
+
+
+def list_projects() -> List[str]:
+    _ensure_projects()
+    try:
+        names = [d for d in os.listdir(PROJECTS_DIR)
+                 if os.path.isdir(os.path.join(PROJECTS_DIR, d)) and not d.startswith("_")]
+    except Exception:
+        names = []
+    return sorted(names) or ["default"]
+
+
+def project_root() -> str:
+    """Absolute path of the active project's data workspace."""
+    _ensure_projects()
+    return os.path.join(PROJECTS_DIR, active_project())
+
+
+def project_file(name: str) -> str:
+    """A per-project file, e.g. project_file('categories.yaml')."""
+    return os.path.join(project_root(), name)
+
+
+def path(key: str) -> str:
+    """Absolute path of cfg['paths'][key]. Per-project data keys (references,
+    briefs, outputs, vectors) resolve under the ACTIVE project; anything else
+    resolves under REPO_ROOT. Falls back to DEFAULTS['paths'] then the key name.
     """
     cfg = load_config()
     paths = cfg.get("paths", {}) or {}
     rel = paths.get(key) or DEFAULTS["paths"].get(key) or key
+    if key in _DATA_KEYS:
+        return os.path.abspath(os.path.join(project_root(), rel))
     return resolve(rel)

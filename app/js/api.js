@@ -83,6 +83,10 @@ export const api = {
   installCapability: (group) => POST('/api/capabilities/install', { group }),
   // checkpoints (the "art style engine": curated base models)
   chatClear: (scope, name) => POST('/api/chat/clear', { scope, name }),
+  projects: () => GET('/api/projects'),
+  projectSwitch: (name) => POST('/api/project/switch', { name }),
+  projectNew: (name) => POST('/api/project/new', { name }),
+  projectDelete: (name) => POST('/api/project/delete', { name }),
   brainModels: () => GET('/api/brain/models'),
   checkpoints: () => GET('/api/checkpoints'),
   checkpointRecommend: (desc) => GET('/api/checkpoints/recommend?' + qs({ desc })),

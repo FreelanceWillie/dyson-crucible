@@ -215,7 +215,7 @@ def search(query: str, kind: str = "lora", cfg: Optional[Dict[str, Any]] = None,
     GETs ``{api}/models?query=&types=&limit=&sort=Highest Rated`` and returns a
     normalised list of dicts::
 
-        {id, name, kind, creator, nsfw, thumb, stats,
+        {id, name, kind, creator, thumb, stats,
          files: [{name, downloadUrl, sizeKB, type, primary}]}
 
     Files + a preview thumbnail are pulled from the FIRST modelVersion. All
@@ -281,7 +281,6 @@ def _normalize_model(item: Dict[str, Any], kind: str) -> Dict[str, Any]:
         "name": item.get("name"),
         "kind": _norm_kind(kind),
         "creator": creator_name,
-        "nsfw": bool(item.get("nsfw", False)),
         "thumb": thumb,
         "stats": item.get("stats") or {},
         "files": files_out,
