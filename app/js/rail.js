@@ -3,7 +3,7 @@
 // settings, delete). Owns #rail. Renders on 'state'; every mutation calls
 // refreshState() so the tree + assets refresh from the server.
 import { api } from './api.js';
-import { state, on, toast, refreshState, selectAsset, selectCategory, askModal } from './state.js';
+import { state, on, toast, refreshState, selectAsset, selectCategory, askModal, confirmModal, setView } from './state.js';
 
 const el = () => document.getElementById('rail');
 const collapsed = {}; // path -> true when a node is folded shut
@@ -127,9 +127,27 @@ function assetTile(a) {
     ? `<img src="${esc(a.thumb)}" alt="" style="width:28px;height:28px;border-radius:6px;object-fit:cover;background:#0a0c11">`
     : `<span style="width:28px;height:28px;border-radius:6px;display:grid;place-items:center;background:var(--panel2)" class="faint">${a.candidateCount || 0}</span>`;
   t.innerHTML = `${thumb}<span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name)}</span>` +
-    `<span class="chip" title="candidates">${a.candidateCount || 0}</span>`;
+    `<span class="chip" title="candidates">${a.candidateCount || 0}</span>` +
+    `<span data-del-asset title="Delete hero" style="cursor:pointer;padding:0 4px;color:var(--faint,#888);font-size:14px">&#10005;</span>`;
   if (state.current === a.name) { t.style.background = 'var(--panel2)'; }
   t.onclick = () => selectAsset(a.name);
+  const x = t.querySelector('[data-del-asset]');
+  if (x) {
+    x.onmouseenter = () => { x.style.color = 'var(--bad,#e55)'; };
+    x.onmouseleave = () => { x.style.color = 'var(--faint,#888)'; };
+    x.onclick = (e) => {
+      e.stopPropagation();
+      confirmModal({
+        title: 'Delete this hero?', danger: true, confirmLabel: 'Delete',
+        body: 'This removes "' + a.name + '" and all its images. This cannot be undone.',
+      }).then((ok) => {
+        if (!ok) { return; }
+        api.deleteAsset(a.name)
+          .then(() => { toast('Deleted ' + a.name); if (state.current === a.name) { setView('home'); } return refreshState(); })
+          .catch((err) => toast('Could not delete: ' + err.message, 'bad'));
+      });
+    };
+  }
   return t;
 }
 
