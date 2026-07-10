@@ -871,6 +871,50 @@ def synthesize(phrase, picks, cfg):
             "negative": "text, watermark, blurry, low quality"}
 
 
+def recommend_checkpoint(description, catalog, cfg):
+    """Pick the best-fit checkpoint from the curated catalog for what the user
+    wants to make. Returns {id, reason}. Uses the brain, with a keyword fallback
+    so it always answers even if the model is unavailable.
+
+    `catalog` is the list of {id, name, best_for, tags} dicts from checkpoints.py."""
+    cat = catalog or []
+    if not cat:
+        return {"id": "", "reason": ""}
+    lines = "\n".join(
+        "- id={0} | {1} | best for: {2} | tags: {3}".format(
+            c.get("id"), c.get("name"), c.get("best_for", ""), ", ".join(c.get("tags", [])))
+        for c in cat)
+    sys_prompt = (
+        "You match a user's art goal to the single best base model (checkpoint) from a\n"
+        "fixed list. Consider the subject and style they describe. Output ONLY a JSON\n"
+        'object: {"id":"<one id from the list>","reason":"<one short plain sentence>"}.')
+    try:
+        raw = _dispatch_raw(sys_prompt, "Models:\n{0}\n\nUser wants: {1}".format(lines, description), cfg)
+        obj = _extract_json(raw)
+        if isinstance(obj, dict) and obj.get("id"):
+            cid = str(obj["id"]).strip()
+            if any(c.get("id") == cid for c in cat):
+                return {"id": cid, "reason": str(obj.get("reason") or "").strip()}
+    except Exception:
+        pass
+    # Keyword fallback: score each model by how many of its tags / best_for words
+    # appear in the description (plus a few subject synonyms).
+    low = (description or "").lower()
+    syn = {"cartoon": "toon", "anime": "stylized", "photo": "realistic", "photoreal": "realistic",
+           "portrait": "portraits", "face": "portraits", "rpg": "rpg", "game": "game",
+           "sprite": "2d", "mascot": "toon", "creature": "characters", "monster": "characters"}
+    for k, v in syn.items():
+        if k in low:
+            low += " " + v
+    best, best_score = cat[0], -1
+    for c in cat:
+        hay = (" ".join(c.get("tags", [])) + " " + c.get("best_for", "")).lower()
+        score = sum(1 for w in set(hay.replace(",", " ").split()) if len(w) > 2 and w in low)
+        if score > best_score:
+            best, best_score = c, score
+    return {"id": best.get("id", ""), "reason": "Best match for what you described."}
+
+
 # ---------------------------------------------------------------------------
 # Real two-way conversation. Unlike refine/explore/interpret (which emit
 # structured JSON), this just TALKS: brainstorming styles, answering questions,

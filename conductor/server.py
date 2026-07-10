@@ -569,6 +569,22 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(st)
             return
 
+        if path == "/api/checkpoints/recommend":
+            desc = (query.get("desc") or query.get("q") or [""])[0].strip()
+            try:
+                cat = ckptmod.catalog()
+                rec = brain.recommend_checkpoint(desc, cat, conf)
+                entry = next((c for c in cat if c.get("id") == rec.get("id")), None)
+                inst = set(ckptmod.installed(conf))
+                if entry:
+                    entry = dict(entry)
+                    entry["installed"] = entry["filename"] in inst
+                    entry["active"] = entry["filename"] == ckptmod.active(conf)
+                self._send_json({"pick": entry, "reason": rec.get("reason", "")})
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, 500)
+            return
+
         if path == "/api/brain/models":
             # Installed local (Ollama) models, so Settings can offer a dropdown
             # instead of a free-text box. Empty list if Ollama is not reachable.
@@ -1515,8 +1531,22 @@ class Handler(BaseHTTPRequestHandler):
                         _write_checkpoint(fm)
                         out["reply"] = "Now drawing with " + fm + "."
                     else:
-                        out["reply"] = ("I couldn't find a model matching that. Open Settings, "
-                                        "Art style engine, to pick or download one.")
+                        # No direct name/tag match: let the brain pick the best-fit model
+                        # from the catalog for what they described (e.g. "a cartoon mascot").
+                        rec = brain.recommend_checkpoint(message, cat, conf)
+                        entry = next((c for c in cat if c.get("id") == rec.get("id")), None)
+                        if entry and entry["filename"] in inst:
+                            _write_checkpoint(entry["filename"])
+                            out["reply"] = ("Switched to " + entry["name"] + ". "
+                                            + (rec.get("reason") or "Best fit for that."))
+                        elif entry:
+                            out["reply"] = ("For that I'd use " + entry["name"] + " ("
+                                            + (rec.get("reason") or "best fit")
+                                            + "), but it isn't downloaded yet. Open Settings, "
+                                            "Art style engine, to get it.")
+                        else:
+                            out["reply"] = ("I couldn't find a model matching that. Open Settings, "
+                                            "Art style engine, to pick or download one.")
             elif action == "pick":
                 name = context.get("asset")
                 if not (name and briefmod.exists(name, paths["briefs"])):

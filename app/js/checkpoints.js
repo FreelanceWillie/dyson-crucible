@@ -62,6 +62,11 @@ function render() {
       </div>
       <div class="bd col" style="gap:14px">
         <div class="faint">This is the model that draws. Pick one that fits your subject. Each is about 2 GB and downloads once. You can switch anytime; it applies to the next batch.</div>
+        <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
+          <input id="ck-desc" class="in" placeholder="Not sure? Describe what you're making (e.g. cute cartoon mascot)" style="flex:1;min-width:220px">
+          <button class="btn sm" id="ck-rec">Help me choose</button>
+        </div>
+        <div id="ck-rec-out"></div>
         <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px">${cards}</div>
         <div class="h">Active model</div>
         <div class="row" style="gap:8px;flex-wrap:wrap">
@@ -73,6 +78,30 @@ function render() {
     </div>`;
 
   m.querySelector('#ck-close').onclick = close;
+  const recBtn = m.querySelector('#ck-rec');
+  const recIn = m.querySelector('#ck-desc');
+  const recOut = m.querySelector('#ck-rec-out');
+  const doRec = () => {
+    const desc = (recIn.value || '').trim();
+    if (!desc) { recIn.focus(); return; }
+    recOut.innerHTML = '<div class="row" style="gap:6px"><span class="spinner"></span> <span class="faint">Thinking...</span></div>';
+    api.checkpointRecommend(desc)
+      .then((r) => {
+        const p = r && r.pick;
+        if (!p) { recOut.innerHTML = '<div class="faint">No suggestion. Pick one below.</div>'; return; }
+        const act = p.active ? '<span class="chip" style="color:var(--good);border-color:var(--good)">already active</span>'
+          : p.installed ? `<button class="btn sm" id="ck-rec-use">Use ${esc(p.name)}</button>`
+          : `<button class="btn sm" id="ck-rec-get">Install ${esc(p.name)}</button>`;
+        recOut.innerHTML = `<div class="card col" style="gap:6px">
+          <div><b>${esc(p.name)}</b> <span class="faint">${esc(r.reason || p.best_for || '')}</span></div>
+          <div class="row" style="gap:6px">${act}</div></div>`;
+        const u = recOut.querySelector('#ck-rec-use'); if (u) { u.onclick = () => selectByFile(p.filename); }
+        const g = recOut.querySelector('#ck-rec-get'); if (g) { g.onclick = () => install(p.id); }
+      })
+      .catch((e) => { recOut.innerHTML = `<div class="faint">Could not suggest: ${esc(e.message)}</div>`; });
+  };
+  if (recBtn) { recBtn.onclick = doRec; }
+  if (recIn) { recIn.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); doRec(); } }; }
   const sel = m.querySelector('#ck-active');
   if (sel) {
     sel.onchange = () => {

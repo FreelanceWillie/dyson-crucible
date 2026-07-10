@@ -83,6 +83,7 @@ export const api = {
   chatClear: (scope, name) => POST('/api/chat/clear', { scope, name }),
   brainModels: () => GET('/api/brain/models'),
   checkpoints: () => GET('/api/checkpoints'),
+  checkpointRecommend: (desc) => GET('/api/checkpoints/recommend?' + qs({ desc })),
   checkpointInstall: (id, select) => POST('/api/checkpoints/install', { id, select }),
   checkpointSelect: (filename) => POST('/api/checkpoints/select', { filename }),
   // animation
