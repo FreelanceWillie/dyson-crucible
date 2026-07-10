@@ -35,43 +35,53 @@ if (window.matchMedia) {
 
 // ----- server settings form --------------------------------------------------
 // groups -> [dotted key, label, {type, opts?, step?, hint?}]
-const GROUPS = [
-  ['Generation', [
-    ['gen.n_candidates', 'Candidates per batch', { type: 'number', step: '1', hint: 'How many options to make each time.' }],
-    ['gen.steps', 'Steps', { type: 'number', step: '1' }],
-    ['gen.cfg', 'Guidance (CFG)', { type: 'number', step: '0.1' }],
-    ['gen.width', 'Width', { type: 'number', step: '8' }],
+// The few knobs most people touch, shown up top.
+const BASIC_GROUPS = [
+  ['Essentials', [
+    ['comfyui.checkpoint', 'Art style engine (model)', { type: 'dynselect', source: 'checkpoints',
+      hint: 'The model that draws. Get more with "Browse & download models" below.' }],
+    ['gen.ip_adapter_weight', 'How closely to follow your reference images', { type: 'range', min: '0', max: '1', step: '0.05',
+      hint: 'Left = your words matter more. Right = copy your reference look more. The middle is usually best.' }],
+    ['gen.n_candidates', 'Options per batch', { type: 'number', step: '1', hint: 'How many images each Generate makes.' }],
+    ['comfyui.warm_on_boot', 'Warm up the engine at startup', { type: 'bool',
+      hint: 'Start the image engine when the app opens so your first image is instant. Reclaim machine frees it anytime.' }],
+  ]],
+];
+
+// Everything else, tucked into a collapsed "Advanced" section.
+const ADVANCED_GROUPS = [
+  ['Image quality', [
+    ['gen.steps', 'Steps (detail)', { type: 'number', step: '1',
+      hint: 'Refinement passes. 28 is the sweet spot; more is slower with little gain past ~35.' }],
+    ['gen.cfg', 'Prompt strength (CFG)', { type: 'number', step: '0.1',
+      hint: 'How hard it sticks to your words. 7 is balanced; too high looks harsh.' }],
+    ['gen.width', 'Width', { type: 'number', step: '8', hint: '512 is safe on a 4GB card. Higher needs more VRAM.' }],
     ['gen.height', 'Height', { type: 'number', step: '8' }],
-    ['gen.ip_adapter', 'Use your reference images', { type: 'bool', hint: 'Off = ignore reference images, draw from your words only.' }],
-    ['gen.ip_adapter_weight', 'How closely to follow your reference images', { type: 'range', min: '0', max: '1', step: '0.05', hint: 'Left = follow your words more. Right = copy your reference look more. Around the middle is usually best. Applies to new heroes.' }],
+    ['gen.ip_adapter', 'Use reference images at all', { type: 'bool',
+      hint: 'Off = ignore references entirely. The slider above is the softer everyday control.' }],
+  ]],
+  ['Engine & brain', [
     ['engine', 'Engine', { type: 'select', opts: [
       { value: 'comfyui', label: 'ComfyUI (recommended)' },
-      { value: 'diffusers', label: 'Diffusers (simple fallback)' }] }],
-    ['comfyui.checkpoint', 'Art style engine (model)', { type: 'dynselect', source: 'checkpoints',
-      hint: 'Pick an installed model. Download more with the button below.' }],
-    ['comfyui.warm_on_boot', 'Warm up the engine at startup', { type: 'bool',
-      hint: 'Start ComfyUI when the app opens so your first image is instant. Reclaim machine frees the GPU anytime.' }],
-  ]],
-  ['Brain', [
+      { value: 'diffusers', label: 'Diffusers (simple fallback)' }], hint: 'ComfyUI is the full engine. Leave as is unless you know why.' }],
     ['brain', 'Brain', { type: 'select', opts: [
       { value: 'local', label: 'Local (Ollama, free)' },
       { value: 'gemini_api', label: 'Google Gemini (needs a key)' },
-      { value: 'claude', label: 'Claude CLI' }] }],
+      { value: 'claude', label: 'Claude CLI' }], hint: 'What powers the chat. Local is free and private.' }],
     ['ollama_model', 'Local model', { type: 'dynselect', source: 'ollama',
-      hint: 'Models you have pulled with Ollama.' }],
+      hint: 'The local AI model that powers chat. Bigger = smarter but slower.' }],
     ['gemini_model', 'Gemini model', { type: 'select', opts: [
-      'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'] }],
+      'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'], hint: 'Only used when Brain is set to Gemini.' }],
   ]],
-  ['Ranking', [
-    ['rank.clip_model', 'CLIP model', { type: 'select', opts: ['ViT-B-32', 'ViT-L-14', 'ViT-H-14'] }],
-  ]],
-  ['Vector', [
-    ['vector.colors', 'Colors', { type: 'number', step: '1', hint: 'Palette size when tracing to vector.' }],
+  ['Ranking & vector', [
+    ['rank.clip_model', 'Ranking model (CLIP)', { type: 'select', opts: ['ViT-B-32', 'ViT-L-14', 'ViT-H-14'],
+      hint: 'Scores candidates against your references. Bigger is slower.' }],
+    ['vector.colors', 'Vector colors', { type: 'number', step: '1', hint: 'Palette size when tracing a winner to SVG.' }],
   ]],
   ['Queue', [
-    ['queue.max_retries', 'Max retries', { type: 'number', step: '1' }],
-    ['queue.poll_seconds', 'Poll seconds', { type: 'number', step: '1' }],
-    ['queue.restart_engine_on_fail', 'Restart engine on failure', { type: 'bool' }],
+    ['queue.max_retries', 'Max retries', { type: 'number', step: '1', hint: 'How many times to retry a failed generation.' }],
+    ['queue.poll_seconds', 'Poll seconds', { type: 'number', step: '1', hint: 'How often the queue checks for progress.' }],
+    ['queue.restart_engine_on_fail', 'Restart engine on failure', { type: 'bool', hint: 'If the engine dies mid-job, relaunch it automatically.' }],
   ]],
 ];
 
@@ -158,11 +168,13 @@ async function renderSettings() {
   try { settings = (await api.settings()).settings || {}; }
   catch (e) { toast('Could not load settings: ' + e.message, 'bad'); }
 
-  const groupsHtml = GROUPS.map(([title, fields]) => `
+  const groupBlock = ([title, fields]) => `
     <div class="col" style="gap:10px">
       <div class="h">${esc(title)}</div>
       ${fields.map(([k, label, spec]) => fieldHtml(k, label, spec, settings[k])).join('')}
-    </div>`).join('');
+    </div>`;
+  const basicsHtml = BASIC_GROUPS.map(groupBlock).join('');
+  const advancedHtml = ADVANCED_GROUPS.map(groupBlock).join('');
 
   box.innerHTML = `
     <div class="col" style="height:100%;padding:14px;gap:14px;overflow:auto">
@@ -170,15 +182,18 @@ async function renderSettings() {
         <b style="font-size:16px">Settings</b>
         <button class="btn sm ghost" id="setClose">Close</button>
       </div>
-      <div class="col" style="gap:16px">${groupsHtml}</div>
+      <div class="col" style="gap:16px">${basicsHtml}</div>
+
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <span class="faint">Need more models? Browse the catalog, download, and get a suggestion for your subject.</span>
+        <button class="btn sm" id="btnCheckpoints">Browse &amp; download models</button>
+      </div>
+
+      <div class="h" id="advToggle" style="cursor:pointer;user-select:none">&#9656; Advanced settings</div>
+      <div id="advBody" class="col" style="gap:16px;display:none">${advancedHtml}</div>
+
       <div class="faint">Some settings apply to the next generation, not the current one.</div>
       <div class="row"><button class="btn primary" id="setSave">Save settings</button></div>
-
-      <div class="h">Art style engine</div>
-      <div class="row" style="justify-content:space-between;align-items:center">
-        <div class="col" style="gap:2px"><span class="faint">The model that draws. Pick one that fits your subject (toon, realistic, fantasy...).</span></div>
-        <button class="btn sm" id="btnCheckpoints">Choose model</button>
-      </div>
 
       <div class="h">This computer</div>
       <div class="col" style="gap:12px">
@@ -229,6 +244,15 @@ async function renderSettings() {
 
   box.querySelector('#setTutorial').onclick = () => { close(); emit('open', 'tutorial'); };
   box.querySelector('#btnCheckpoints').onclick = () => { emit('open', 'checkpoints'); };
+  const advT = box.querySelector('#advToggle');
+  const advB = box.querySelector('#advBody');
+  if (advT && advB) {
+    advT.onclick = () => {
+      const open = advB.style.display === 'none';
+      advB.style.display = open ? '' : 'none';
+      advT.innerHTML = (open ? '&#9662;' : '&#9656;') + ' Advanced settings';
+    };
+  }
   populateDynSelects(box);
 
   renderFeaturePacks(box);
