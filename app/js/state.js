@@ -65,6 +65,25 @@ export function askModal({ title, fields, submitLabel }) {
   });
 }
 
+// Full-size image preview in the shared #modal. Click the backdrop or Close to
+// dismiss. Used by any grid of thumbnails (candidates, Surprise Me tiles, ...).
+export function showImage(url, caption) {
+  const m = document.getElementById('modal');
+  if (!m || !url) { return; }
+  m.classList.add('open');
+  m.innerHTML = `<div class="box"><div class="hd row"><b>Preview</b><span style="flex:1"></span>`
+    + `<button class="btn sm ghost" id="img-x">&#10005;</button></div>`
+    + `<div class="bd" style="text-align:center">`
+    + `<img src="${_esc(url)}" alt="${_esc(caption || 'preview')}" style="max-width:100%;max-height:72vh;border-radius:8px">`
+    + (caption ? `<div class="faint" style="margin-top:8px">${_esc(caption)}</div>` : '')
+    + `</div></div>`;
+  const close = () => { m.classList.remove('open'); m.innerHTML = ''; document.removeEventListener('keydown', key); };
+  const key = (e) => { if (e.key === 'Escape') { close(); } };
+  document.addEventListener('keydown', key);
+  m.onclick = (e) => { if (e.target === m) { close(); } };
+  const x = m.querySelector('#img-x'); if (x) { x.onclick = close; }
+}
+
 // toast helper (used everywhere)
 export function toast(msg, kind) {
   const wrap = document.getElementById('toasts');

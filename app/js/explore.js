@@ -3,7 +3,7 @@
 // different takes; like the ones you want, then combine them into one direction
 // you can start a hero from.
 import { api } from './api.js';
-import { state, on, toast, refreshState, selectAsset, setView, askModal } from './state.js';
+import { state, on, toast, refreshState, selectAsset, setView, askModal, showImage } from './state.js';
 
 const ASSET = 'explore'; // the moodboard slot this view owns
 const POLL_MS = 2000;
@@ -162,7 +162,7 @@ function renderBoard() {
     cell.className = 'tile col' + (picked ? ' picked' : '');
     cell.style.gap = '6px';
     const media = t && t.url
-      ? `<img src="${esc(t.url)}" alt="${esc(t.label)}" style="width:100%;aspect-ratio:1;object-fit:cover">`
+      ? `<img src="${esc(t.url)}" alt="${esc(t.label)}" data-zoom="${i}" title="Click to enlarge" style="width:100%;aspect-ratio:1;object-fit:cover;cursor:zoom-in">`
       : `<div style="aspect-ratio:1;display:grid;place-items:center"><span class="spinner"></span></div>`;
     cell.innerHTML = `
       ${media}
@@ -176,6 +176,10 @@ function renderBoard() {
     grid.appendChild(cell);
   });
 
+  grid.querySelectorAll('[data-zoom]').forEach((img) => img.onclick = () => {
+    const t = (vm.takes || [])[parseInt(img.dataset.zoom, 10)];
+    if (t && t.url) { showImage(t.url, t.label || ''); }
+  });
   grid.querySelectorAll('[data-pick]').forEach((b) => b.onclick = () => togglePick(parseInt(b.dataset.pick, 10)));
   grid.querySelectorAll('[data-note]').forEach((inp) => inp.oninput = (e) => {
     const i = parseInt(inp.dataset.note, 10);
