@@ -18,17 +18,27 @@ function Warn($m) { Write-Host "[warn]   $m" -ForegroundColor Yellow }
 
 Set-Location $RepoRoot
 
-# 1. Back up config + pull latest (autostash re-applies your local config edits).
+# 1. Back up config + sync to the latest published code.
 if (Test-Path "config.yaml") { Copy-Item "config.yaml" "config.yaml.bak" -Force; Ok "backed up config.yaml -> config.yaml.bak" }
 
-Say "pulling latest code..."
+Say "syncing latest code..."
 $before = (git rev-parse --short HEAD 2>$null)
-git pull --autostash --no-edit
+# Hard-sync to origin instead of a merge-pull: this is a one-way "get the latest
+# published version" for a user who never commits, and it stays robust even if
+# upstream history was rewritten (a normal 'git pull' would then fail to merge).
+# Only TRACKED files are touched; config.yaml, projects/, models, and outputs are
+# gitignored (user data) and are left untouched.
+git fetch origin --prune 2>$null
+$branch = (git rev-parse --abbrev-ref HEAD 2>$null)
+if (-not $branch -or $branch -eq "HEAD") { $branch = "master" }
+git reset --hard ("origin/" + $branch) 2>$null
 $after = (git rev-parse --short HEAD 2>$null)
 if ($before -eq $after) { Ok "already up to date ($after)." } else { Ok "updated $before -> $after." }
 
-# If the pull clobbered config.yaml (rare merge case), restore the user's copy.
-if ((Test-Path "config.yaml.bak") -and (Test-Path "config.yaml")) {
+# Safety net: if config.yaml went missing/empty for any reason, restore the backup.
+if ((Test-Path "config.yaml.bak") -and (-not (Test-Path "config.yaml"))) {
+    Copy-Item "config.yaml.bak" "config.yaml" -Force; Warn "restored config.yaml from backup."
+} elseif ((Test-Path "config.yaml.bak") -and (Test-Path "config.yaml")) {
     $cur = Get-Content "config.yaml" -Raw -ErrorAction SilentlyContinue
     if (-not $cur -or $cur.Trim().Length -lt 10) {
         Copy-Item "config.yaml.bak" "config.yaml" -Force; Warn "restored config.yaml from backup."
