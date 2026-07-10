@@ -81,6 +81,33 @@ CATALOG: List[Dict[str, Any]] = [
         "url": "https://huggingface.co/Yntec/GameIcons3D/resolve/main/GameIcons3D.safetensors",
         "size_mb": 4067,  # full precision (~4GB); runs on a 4GB card via --lowvram
     },
+    {
+        "id": "counterfeit25",
+        "name": "Counterfeit 2.5",
+        "best_for": "Anime and manga style characters and scenes, clean line art.",
+        "tags": ["Anime", "Manga", "Stylized"],
+        "filename": "Counterfeit-V2.5_fp16.safetensors",
+        "url": "https://huggingface.co/gsdf/Counterfeit-V2.5/resolve/main/Counterfeit-V2.5_fp16.safetensors",
+        "size_mb": 2033,
+    },
+    {
+        "id": "pixelkicks",
+        "name": "PixelKicks",
+        "best_for": "Native pixel-art sprites and scenes, retro 8/16-bit game look.",
+        "tags": ["Pixel", "Retro", "Sprites", "2D"],
+        "filename": "pixelkicks_01.safetensors",
+        "url": "https://huggingface.co/Yntec/PixelKicks/resolve/main/pixelkicks_01.safetensors",
+        "size_mb": 2033,
+    },
+    {
+        "id": "dreamworks3d",
+        "name": "DreamWorks 3D",
+        "best_for": "3D animated movie look (Pixar / DreamWorks style) characters and creatures.",
+        "tags": ["3D", "Cartoon", "Stylized", "Characters"],
+        "filename": "DreamWorks.safetensors",
+        "url": "https://huggingface.co/Yntec/DreamWorks/resolve/main/DreamWorks.safetensors",
+        "size_mb": 2448,
+    },
 ]
 
 _BY_ID = {c["id"]: c for c in CATALOG}

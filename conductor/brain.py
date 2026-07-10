@@ -908,14 +908,20 @@ def recommend_checkpoint(description, catalog, cfg):
            "object": "objects", "objects": "objects", "icon": "icons", "weapon": "weapons",
            "sword": "weapons", "axe": "weapons", "shield": "items", "potion": "items",
            "gear": "items", "equipment": "items", "loot": "items", "treasure": "items",
-           "chest": "items", "armor": "items", "food": "items", "gem": "items", "tool": "items"}
+           "chest": "items", "armor": "items", "food": "items", "gem": "items", "tool": "items",
+           # style families
+           "anime": "anime", "manga": "manga", "waifu": "anime",
+           "pixel": "pixel", "8bit": "pixel", "16bit": "pixel", "retro": "retro",
+           "3d": "3d", "pixar": "3d", "dreamworks": "3d", "cgi": "3d", "claymation": "3d"}
     for k, v in syn.items():
         if k in low:
             low += " " + v
+    low_words = set(re.split(r"[^a-z0-9]+", low))
     best, best_score = cat[0], -1
     for c in cat:
         hay = (" ".join(c.get("tags", [])) + " " + c.get("best_for", "")).lower()
-        score = sum(1 for w in set(hay.replace(",", " ").split()) if len(w) > 2 and w in low)
+        words = set(re.split(r"[^a-z0-9]+", hay))
+        score = sum(1 for w in words if len(w) > 2 and w in low_words)
         if score > best_score:
             best, best_score = c, score
     return {"id": best.get("id", ""), "reason": "Best match for what you described."}
