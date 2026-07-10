@@ -920,7 +920,13 @@ FAQ = (
     "code, re-checks the engine and models, and restarts. Safe to run any time.\n"
     "- If gens are slow or fail: watch the queue for live progress and time left, and "
     "open Diagnostics (bottom bar) to copy a full report. Check the health panel "
-    "(Doctor). On a 4GB GPU, launch ComfyUI with --lowvram and keep size at 512."
+    "(Doctor). On a 4GB GPU, launch ComfyUI with --lowvram and keep size at 512.\n"
+    "- Where results show up (there is NO separate 'images tab'): Surprise Me takes "
+    "appear as tiles on the Surprise Me screen; a hero's generated candidates appear "
+    "on that hero's page (click the hero in the left rail or the Your Heroes grid); "
+    "post-processed and animated outputs appear in that hero's area too. The queue "
+    "strip along the bottom shows each job's progress and turns to 'done' when finished; "
+    "results are not shown inside the queue chip itself, only its status."
 )
 
 

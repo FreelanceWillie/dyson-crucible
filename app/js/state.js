@@ -5,7 +5,9 @@ import { api } from './api.js';
 
 const listeners = {};
 export function on(evt, fn) { (listeners[evt] = listeners[evt] || []).push(fn); }
-export function emit(evt, payload) { (listeners[evt] || []).forEach((f) => { try { f(payload); } catch (e) { console.error(e); } }); }
+// Variadic so multi-arg emitters work, e.g. setView('view', v, data) reaches
+// on('view', (v, data)). Single-payload listeners simply ignore extra args.
+export function emit(evt, ...args) { (listeners[evt] || []).forEach((f) => { try { f(...args); } catch (e) { console.error(e); } }); }
 
 export const state = {
   assets: [],

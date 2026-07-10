@@ -335,14 +335,49 @@ function exploreFurther() {
 
 // ---- lifecycle ------------------------------------------------------------
 
+// Adopt an explore run that was started elsewhere (e.g. from the control-panel
+// chat). Without this, a chat "surprise me..." ran the job server-side but the
+// view sat on the idle form and the finished tiles never appeared.
+function adoptRun(data) {
+  if (!vm) { vm = freshVm(); }
+  if (data && (data.job || (data.directions && data.directions.length))) {
+    if (data.params && data.params.phrase) {
+      vm.phrase = data.params.phrase;
+      const pi = document.getElementById('ex-phrase');
+      if (pi) { pi.value = vm.phrase; }
+    }
+    vm.status = 'pending';
+    vm.takes = []; vm.picks = {}; vm.combined = null;
+    renderBoard();
+    startPoll();  // polls the 'explore' moodboard slot the job writes to
+    return;
+  }
+  // No handoff: peek at the server in case a run is in progress or just finished
+  // (so results are never stranded), otherwise leave the fresh form.
+  peekBoard();
+}
+
+async function peekBoard() {
+  try {
+    const board = await api.moodboard(ASSET);
+    const has = board && ((board.takes && board.takes.length) || (board.directions && board.directions.length));
+    if (board && (board.status === 'pending' || board.status === 'running' || has)) {
+      vm.status = 'pending';
+      applyBoard(board);
+      if (board.status !== 'done' && board.status !== 'failed' && board.status !== 'none') { startPoll(); }
+    }
+  } catch (_) { /* fresh form is fine */ }
+}
+
 export function mount() {
-  on('view', (v) => {
+  on('view', (v, data) => {
     if (v === 'explore') {
       if (!vm) { vm = freshVm(); }
       render();
+      adoptRun(data);
     } else {
       stopPoll();
     }
   });
-  if (state.view === 'explore') { vm = freshVm(); render(); }
+  if (state.view === 'explore') { vm = freshVm(); render(); adoptRun(null); }
 }
