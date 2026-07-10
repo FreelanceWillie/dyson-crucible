@@ -16,12 +16,19 @@ the user can also install any checkpoint by hand into models/checkpoints and it
 appears in the installed list automatically.
 """
 
+import json
+import os
 from typing import Any, Dict, List, Optional
 
 try:
     from . import models as modelsmod  # type: ignore
 except Exception:  # loose-script path
     import models as modelsmod  # type: ignore
+
+try:
+    from . import cfg as _cfg  # type: ignore
+except Exception:
+    import cfg as _cfg  # type: ignore
 
 
 # Each entry: id (stable slug), name (friendly), best_for (one-line plain copy),
@@ -110,16 +117,55 @@ CATALOG: List[Dict[str, Any]] = [
     },
 ]
 
-_BY_ID = {c["id"]: c for c in CATALOG}
+# Optional local additions: a gitignored checkpoints_local.json next to the repo
+# lets you add your OWN models to the picker without editing this file or having
+# them tracked in git. Update never touches it (gitignored; the installer only
+# downloads, never deletes). Format: {"models": [ {id, name, best_for, tags,
+# filename, url, size_mb}, ... ]} (a bare list also works). See
+# checkpoints_local.example.json.
+_LOCAL_FILE = os.path.join(_cfg.REPO_ROOT, "checkpoints_local.json")
+
+
+def _load_local() -> List[Dict[str, Any]]:
+    if not os.path.isfile(_LOCAL_FILE):
+        return []
+    try:
+        with open(_LOCAL_FILE, "r", encoding="utf-8-sig") as fh:
+            data = json.load(fh)
+    except Exception as exc:  # bad JSON must never break the picker
+        print(f"[checkpoints] could not read checkpoints_local.json ({exc})")
+        return []
+    entries = data.get("models") if isinstance(data, dict) else data
+    out = []
+    for e in (entries or []):
+        if not isinstance(e, dict) or not e.get("id") or not e.get("filename"):
+            continue
+        e = dict(e)
+        e.setdefault("name", e["id"])
+        e.setdefault("best_for", "")
+        e.setdefault("tags", [])
+        e.setdefault("size_mb", 0)
+        e.setdefault("url", "")
+        out.append(e)
+    return out
+
+
+def _all() -> List[Dict[str, Any]]:
+    """Built-in catalog + any local additions (deduped by id, local wins)."""
+    seen = {}
+    for c in CATALOG + _load_local():
+        seen[c["id"]] = c
+    return list(seen.values())
 
 
 def catalog() -> List[Dict[str, Any]]:
-    """The raw curated list (copies, so callers can annotate freely)."""
-    return [dict(c) for c in CATALOG]
+    """The full model list (built-in + local additions), as copies."""
+    return [dict(c) for c in _all()]
 
 
 def by_id(cid: str) -> Optional[Dict[str, Any]]:
-    return _BY_ID.get((cid or "").strip())
+    cid = (cid or "").strip()
+    return next((c for c in _all() if c.get("id") == cid), None)
 
 
 def _ckpt_dir(cfg: Dict[str, Any]) -> str:

@@ -32,3 +32,6 @@ config.yaml
 
 # --- Per-project data workspaces (created at runtime) ---
 projects/
+
+# --- Your own model additions (never tracked; see checkpoints_local.example.json) ---
+checkpoints_local.json

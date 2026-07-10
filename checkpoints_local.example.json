@@ -1,0 +1,14 @@
+{
+  "_readme": "Copy this file to 'checkpoints_local.json' (same folder) to add your own models to the picker. It is gitignored, so it stays private and Update.bat never touches it. Each model needs at least an id, a name, a filename (what it saves as in ComfyUI/models/checkpoints), and a url to download it from. Find models on Civitai or Hugging Face; use the direct download URL of the .safetensors file. size_mb is optional (shown on the Install button).",
+  "models": [
+    {
+      "id": "my-custom-model",
+      "name": "My Custom Model",
+      "best_for": "What this model is good at, in a few plain words.",
+      "tags": ["Custom"],
+      "filename": "myCustomModel.safetensors",
+      "url": "https://huggingface.co/USER/REPO/resolve/main/myCustomModel.safetensors",
+      "size_mb": 2034
+    }
+  ]
+}
