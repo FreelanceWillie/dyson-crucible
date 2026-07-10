@@ -806,6 +806,15 @@ def _quick_route(message):
 def interpret(message, context, cfg):
     """Classify a chat message into {action, params}. Falls back to 'refine' if
     an asset is selected (so plain feedback still works) else 'chat'."""
+    low0 = (message or "").lower()
+    # Questions about which model/checkpoint to use go to the catalog recommender
+    # (a small local model does not know the app's models and answers generically).
+    # Route these BEFORE the generic question path.
+    if (re.search(r"\b(checkpoint|art ?style ?engine)\b", low0)
+            or (re.search(r"\bmodel\b", low0)
+                and re.search(r"\b(which|what|whats|best|recommend|should|good|use|for|pick|choose|need)\b", low0))) \
+            and not re.search(r"\b(ollama|brain|gemini|llm|language model)\b", low0):
+        return {"action": "recommend_model", "params": {"desc": message}}
     # Questions want a reply, not a command. Decide this deterministically before
     # asking a small model, which tends to mis-route "how do I ...?" to an action.
     if _looks_like_question(message):
@@ -897,34 +906,33 @@ def recommend_checkpoint(description, catalog, cfg):
                 return {"id": cid, "reason": str(obj.get("reason") or "").strip()}
     except Exception:
         pass
-    # Keyword fallback: score each model by how many of its tags / best_for words
-    # appear in the description (plus a few subject synonyms).
-    low = (description or "").lower()
-    syn = {"cartoon": "toon", "anime": "stylized", "photo": "realistic", "photoreal": "realistic",
-           "portrait": "portraits", "face": "portraits", "rpg": "rpg", "game": "game",
-           "sprite": "2d", "mascot": "toon", "creature": "characters", "monster": "characters",
-           # items / props / objects (NOT people)
-           "item": "items", "items": "items", "prop": "props", "props": "props",
-           "object": "objects", "objects": "objects", "icon": "icons", "weapon": "weapons",
-           "sword": "weapons", "axe": "weapons", "shield": "items", "potion": "items",
-           "gear": "items", "equipment": "items", "loot": "items", "treasure": "items",
-           "chest": "items", "armor": "items", "food": "items", "gem": "items", "tool": "items",
-           # style families
-           "anime": "anime", "manga": "manga", "waifu": "anime",
-           "pixel": "pixel", "8bit": "pixel", "16bit": "pixel", "retro": "retro",
-           "3d": "3d", "pixar": "3d", "dreamworks": "3d", "cgi": "3d", "claymation": "3d"}
-    for k, v in syn.items():
-        if k in low:
-            low += " " + v
-    low_words = set(re.split(r"[^a-z0-9]+", low))
+    # Keyword fallback (when the model is unavailable). Strong SUBJECT signals
+    # (item/anime/pixel/...) map to a tag and weigh far more than incidental word
+    # overlap, so "item art for a card game" is not hijacked by the word "game".
+    low_words = set(re.split(r"[^a-z0-9]+", (description or "").lower()))
+    # subject keyword -> the catalog tag it implies
+    SIGNALS = {
+        "items": ["item", "items", "prop", "props", "weapon", "weapons", "sword", "axe",
+                  "shield", "potion", "gear", "equipment", "loot", "treasure", "chest",
+                  "gem", "coin", "coins", "tool", "icon", "icons", "object", "objects", "card", "cards"],
+        "anime": ["anime", "manga", "waifu"],
+        "pixel": ["pixel", "8bit", "16bit", "retro", "sprite", "sprites"],
+        "3d": ["pixar", "dreamworks", "3d", "cgi", "claymation"],
+        "realistic": ["photoreal", "photorealistic", "realistic", "photo", "lifelike"],
+        "portraits": ["portrait", "portraits", "face", "faces", "headshot"],
+        "toon": ["cartoon", "toon", "mascot"],
+        "fantasy": ["fantasy", "rpg", "dungeon", "medieval", "knight", "wizard", "dragon"],
+    }
+    hit_tags = {tag for tag, kws in SIGNALS.items() if any(k in low_words for k in kws)}
     best, best_score = cat[0], -1
     for c in cat:
-        hay = (" ".join(c.get("tags", [])) + " " + c.get("best_for", "")).lower()
-        words = set(re.split(r"[^a-z0-9]+", hay))
-        score = sum(1 for w in words if len(w) > 2 and w in low_words)
+        tags = set(t.lower() for t in c.get("tags", []))
+        words = set(re.split(r"[^a-z0-9]+", (" ".join(c.get("tags", [])) + " " + c.get("best_for", "")).lower()))
+        score = 5 * len(hit_tags & tags)                                   # strong subject signal
+        score += sum(1 for w in words if len(w) > 2 and w in low_words)    # incidental overlap
         if score > best_score:
             best, best_score = c, score
-    return {"id": best.get("id", ""), "reason": "Best match for what you described."}
+    return {"id": best.get("id", ""), "reason": "Best fit for what you described."}
 
 
 # ---------------------------------------------------------------------------

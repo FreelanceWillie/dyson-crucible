@@ -1540,6 +1540,27 @@ class Handler(BaseHTTPRequestHandler):
                     pass
                 out["reply"] = ("Reclaimed your machine. Paused the queue, stopped the current job"
                                 + (", freed the GPU." if freed else "."))
+            elif action == "recommend_model":
+                # "which checkpoint for X?" -> name the best catalog model + how to get it.
+                cat = ckptmod.catalog()
+                inst = set(ckptmod.installed(conf))
+                rec = brain.recommend_checkpoint(p.get("desc") or message, cat, conf)
+                entry = next((c for c in cat if c.get("id") == rec.get("id")), None)
+                if not entry:
+                    out["reply"] = ("Open Settings, Art style engine, and use \"Help me choose\" "
+                                    "to match a model to what you're making.")
+                elif entry["filename"] in inst and entry["filename"] == ckptmod.active(conf):
+                    out["reply"] = (entry["name"] + " is a good fit and it's already your active model. "
+                                    + (rec.get("reason") or ""))
+                elif entry["filename"] in inst:
+                    _write_checkpoint(entry["filename"])
+                    out["reply"] = ("Switched you to " + entry["name"] + " for that. "
+                                    + (rec.get("reason") or ""))
+                else:
+                    out["reply"] = ("For that I'd use " + entry["name"] + ". "
+                                    + (rec.get("reason") or "")
+                                    + " It's not downloaded yet, get it in Settings, Art style engine "
+                                    "(or say 'install " + entry["name"] + "').")
             elif action == "set_model":
                 want = (p.get("name") or message or "").strip().lower()
                 toks = [t for t in re.split(r"[^a-z0-9]+", want) if len(t) > 2]
