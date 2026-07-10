@@ -105,7 +105,21 @@ Rules:
 - When the user says something is "too X", REMOVE the tokens causing X from the
   prompt and ADD them (or their symptoms) to the negative prompt.
 - When they want "more Y", ADD strong Y tokens to the prompt.
-- Preserve tokens the user did not complain about. Do not rewrite from scratch.
+- Preserve tokens the user did not complain about (for tweaks). Do not rewrite
+  from scratch for a small tweak.
+- REJECTION / REFRAME: when the user rejects the WHOLE batch ("none of these look
+  like X", "you're not getting it", "not what I want"), the current direction is
+  wrong. DO rewrite the prompt to describe what they asked for in plain, literal,
+  specific terms, and push the likely-wrong qualities of the last images into the
+  negative. Infer those wrong qualities from the current prompt: if it was fancy /
+  vague (e.g. "a golden hammer"), the images were probably ornate, fantasy,
+  glowing, decorative -- negative those.
+- PLAIN / ORDINARY intent: if they want something "normal", "ordinary", "realistic",
+  "plain", or "simple", use exactly those words in the prompt and NEGATIVE the
+  opposites ("ornate, decorative, fantasy, magical, stylized, glowing, jewelled").
+- ITEM / ICON framing: for a game item, prop, or trading-card icon, add "single
+  item, centered, item icon, clean plain background" to the prompt and NEGATIVE
+  "person, character, hands, face, scene, background clutter, text".
 
 Example 1
 FEEDBACK: "too wizard-y, more evil warlock"
@@ -113,6 +127,13 @@ CURRENT prompt: "a wizard, long robe, magic staff, pointy hat, arcane, fantasy"
 CURRENT negative: "blurry, low quality"
 OUTPUT:
 {"prompt":"an evil warlock, corrupted sorcerer, dark robe, menacing, sinister, glowing red eyes, fantasy","negative":"blurry, low quality, wizard, staff, pointy hat, friendly, whimsical","ip_adapter_weight":0.75,"reasoning":"Dropped wizard/staff/hat tokens and added corrupted, menacing warlock cues; pushed the old wizard tropes into negatives."}
+
+Example 3 (whole-batch rejection -> reframe to a plain item)
+FEEDBACK: "No! You're not getting it. None of these look like a normal hammer, like you'd find on a trading card"
+CURRENT prompt: "a golden hammer"
+CURRENT negative: "blurry, low quality"
+OUTPUT:
+{"prompt":"a plain steel claw hammer with a wooden handle, ordinary everyday tool, single item, centered, trading card item icon, clean plain background, realistic","negative":"blurry, low quality, ornate, decorative, fantasy, magical, glowing, jewelled, gold, stylized, person, hands, face, scene, text","reasoning":"Batch was too ornate/fancy; pivoted to a plain ordinary hammer as a clean centered item icon and pushed the fancy/fantasy traits into the negative."}
 
 Example 2
 FEEDBACK: "colors are washed out, make it match my references more"
