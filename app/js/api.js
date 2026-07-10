@@ -88,6 +88,7 @@ export const api = {
   projectNew: (name) => POST('/api/project/new', { name }),
   projectDelete: (name) => POST('/api/project/delete', { name }),
   brainModels: () => GET('/api/brain/models'),
+  brainTest: () => POST('/api/brain/test', {}),
   checkpoints: () => GET('/api/checkpoints'),
   checkpointRecommend: (desc) => GET('/api/checkpoints/recommend?' + qs({ desc })),
   checkpointInstall: (id, select) => POST('/api/checkpoints/install', { id, select }),

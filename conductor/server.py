@@ -741,6 +741,16 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"ok": True, "started": group})
             return
 
+        if path == "/api/brain/test":
+            # Validate the currently-saved brain (used by the Gemini onboarding after
+            # a key is pasted). probe() calls the backend directly and surfaces a
+            # bad/absent key instead of falling back to a canned reply.
+            ok, detail = brain.probe(conf)
+            # NOTE: use "detail", not "error" -- a failed probe is a valid result,
+            # not an API error (the client wrapper throws on an "error" field).
+            self._send_json({"ok": ok, "detail": detail, "brain": conf.get("brain", "local")})
+            return
+
         if path.startswith("/api/project/"):
             op = path[len("/api/project/"):]
             name = (data.get("name") or "").strip()
@@ -996,7 +1006,7 @@ class Handler(BaseHTTPRequestHandler):
             b = briefmod.load(name, paths["briefs"])
             briefmod.append_chat(b, "user", feedback)
             try:
-                b = brain.refine_brief(b, feedback, conf)
+                b = brain.refine_brief(b, feedback, conf, images=self._refine_images(conf, paths, name))
             except Exception as exc:
                 briefmod.append_chat(b, "system", "brain unavailable: " + str(exc))
             briefmod.save(name, b, paths["briefs"])
@@ -1521,7 +1531,8 @@ class Handler(BaseHTTPRequestHandler):
                 name = context.get("asset")
                 if name and briefmod.exists(name, paths["briefs"]):
                     b = briefmod.load(name, paths["briefs"])
-                    b = brain.refine_brief(b, p.get("feedback") or message, conf)
+                    b = brain.refine_brief(b, p.get("feedback") or message, conf,
+                                           images=self._refine_images(conf, paths, name))
                     briefmod.save(name, b, paths["briefs"])
                     out["brief"] = b
                     if do_gen:
@@ -1733,13 +1744,25 @@ class Handler(BaseHTTPRequestHandler):
     # Only these keys are exposed to the GUI (safe, useful knobs). Nested keys
     # use dotted paths so the client can send a flat patch.
     _SETTING_KEYS = [
-        "brain", "ollama_model", "gemini_model",
+        "brain", "ollama_model", "gemini_model", "gemini_api_key",
         "gen.n_candidates", "gen.steps", "gen.cfg", "gen.width", "gen.height",
         "gen.ip_adapter", "gen.ip_adapter_weight", "engine", "comfyui.checkpoint",
         "comfyui.warm_on_boot",
         "rank.clip_model", "vector.colors",
         "queue.max_retries", "queue.poll_seconds", "queue.restart_engine_on_fail",
     ]
+
+    def _refine_images(self, conf, paths, name):
+        """Paths to the current candidates, ONLY when the brain can see them
+        (Gemini). None otherwise, so a local refine does not read image files."""
+        if (conf.get("brain") or "local") != "gemini_api":
+            return None
+        try:
+            _vn, urls = _candidate_urls(paths, name)
+            imgs = [_url_to_fspath(paths, u) for u in (urls or [])[:4]]
+            return [p for p in imgs if p and os.path.isfile(p)] or None
+        except Exception:
+            return None
 
     def _editable_settings(self, conf):
         out = {}
@@ -1748,6 +1771,9 @@ class Handler(BaseHTTPRequestHandler):
             for part in key.split("."):
                 cur = (cur or {}).get(part) if isinstance(cur, dict) else None
             out[key] = cur
+        # Never ship the raw API key to the browser -- just whether one is set.
+        if out.get("gemini_api_key"):
+            out["gemini_api_key"] = "set"
         return out
 
     def _save_settings(self, patch):

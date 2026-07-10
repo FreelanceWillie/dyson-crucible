@@ -355,16 +355,29 @@ def _call_local(messages: List[Dict[str, str]], cfg: Dict[str, Any]) -> str:
     return msg.get("content", "") or data.get("response", "") or ""
 
 
-def _call_gemini(messages: List[Dict[str, str]], cfg: Dict[str, Any]) -> str:
-    """Call Google's Generative Language generateContent REST endpoint."""
-    requests = _requests()
+def _gemini_key(cfg: Dict[str, Any]) -> str:
+    """The Gemini API key: prefer the one pasted into the app (config
+    gemini_api_key), fall back to the configured env var. Lets a non-technical
+    user just paste a key in Settings instead of setting an environment variable."""
+    key = str(_cfg_get(cfg, "gemini_api_key", "") or "").strip()
+    if key:
+        return key
     key_env = str(_cfg_get(cfg, "gemini_api_key_env", "GEMINI_API_KEY"))
-    api_key = os.environ.get(key_env, "")
+    return (os.environ.get(key_env, "") or "").strip()
+
+
+def _call_gemini(messages: List[Dict[str, str]], cfg: Dict[str, Any], images=None) -> str:
+    """Call Google's Generative Language generateContent REST endpoint. If
+    `images` (a list of local file paths) is given, they are attached so the model
+    can SEE the current candidates when refining."""
+    requests = _requests()
+    api_key = _gemini_key(cfg)
     if not api_key:
         raise RuntimeError(
-            "Gemini brain selected but env var '{0}' is not set.".format(key_env)
+            "Gemini brain selected but no API key is set. Paste a free key in "
+            "Settings (Smarter brain), or set the GEMINI_API_KEY env var."
         )
-    model = str(_cfg_get(cfg, "gemini_model", "gemini-2.0-flash"))
+    model = str(_cfg_get(cfg, "gemini_model", "gemini-2.5-flash"))
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         + model
@@ -373,8 +386,17 @@ def _call_gemini(messages: List[Dict[str, str]], cfg: Dict[str, Any]) -> str:
     )
     # Gemini has no dedicated system role in v1beta generateContent, so we fold
     # the system persona into the single user turn.
-    prompt = _flatten_messages(messages)
-    payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
+    parts: List[Dict[str, Any]] = [{"text": _flatten_messages(messages)}]
+    for p in (images or []):
+        try:
+            import base64
+            with open(p, "rb") as fh:
+                b64 = base64.b64encode(fh.read()).decode("ascii")
+            mime = "image/png" if str(p).lower().endswith(".png") else "image/jpeg"
+            parts.append({"inline_data": {"mime_type": mime, "data": b64}})
+        except Exception:
+            continue  # a missing candidate must not break the refine
+    payload = {"contents": [{"role": "user", "parts": parts}]}
     resp = requests.post(url, json=payload, timeout=120)
     resp.raise_for_status()
     data = resp.json()
@@ -486,8 +508,12 @@ def _apply_patch(brief: Dict[str, Any], patch: Dict[str, Any]) -> List[str]:
 # ---------------------------------------------------------------------------
 # THE public entry point.
 # ---------------------------------------------------------------------------
-def refine_brief(brief: Dict[str, Any], feedback: str, cfg: Dict[str, Any]) -> Dict[str, Any]:
+def refine_brief(brief: Dict[str, Any], feedback: str, cfg: Dict[str, Any], images=None) -> Dict[str, Any]:
     """Rewrite `brief` from plain-language `feedback` using the configured brain.
+
+    If `images` (paths to the current candidates) is given AND the brain can see
+    (Gemini), they are attached so it critiques what was actually made -- turning
+    "none of these look right" into a grounded edit. Other brains ignore images.
 
     Flow:
       1. Snapshot the brief so the edit is undoable.
@@ -521,7 +547,11 @@ def refine_brief(brief: Dict[str, Any], feedback: str, cfg: Dict[str, Any]) -> D
     # Call the backend, tolerating any failure.
     try:
         messages = _build_messages(brief, feedback)
-        raw = backend(messages, cfg if isinstance(cfg, dict) else _load_cfg_fallback())
+        use_cfg = cfg if isinstance(cfg, dict) else _load_cfg_fallback()
+        if which == "gemini_api" and images:
+            raw = _call_gemini(messages, use_cfg, images)  # let Gemini SEE the candidates
+        else:
+            raw = backend(messages, use_cfg)
     except Exception as exc:  # noqa: BLE001 - degrade, do not crash the loop
         _append_chat(
             brief,
@@ -633,6 +663,18 @@ def _dispatch_raw(system, user, cfg):
     messages = [{"role": "system", "content": system},
                 {"role": "user", "content": user}]
     return backend(messages, cfg if isinstance(cfg, dict) else _load_cfg_fallback())
+
+
+def probe(cfg):
+    """Actually call the configured backend once and return (ok, detail). Unlike
+    chat(), this surfaces REAL failures (bad/absent key, unreachable server)
+    instead of a friendly fallback -- used by the Settings 'test brain' action."""
+    try:
+        r = _dispatch_raw("You are a connectivity test. Reply with the single word: ok.",
+                          "ok", cfg)
+        return (bool(r and r.strip()), (r or "").strip()[:80])
+    except Exception as exc:  # noqa: BLE001
+        return (False, str(exc))
 
 
 def _extract_json(text):

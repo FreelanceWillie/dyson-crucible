@@ -15,7 +15,8 @@ ollama_model: qwen2.5:3b-instruct   # any instruct model you have pulled
 ollama_url: http://localhost:11434  # default Ollama daemon address
 
 # --- Gemini API brain settings ---
-gemini_api_key_env: GEMINI_API_KEY  # name of the env var holding the key
+gemini_api_key: ""                  # paste a free key here (or via Settings) to use Gemini
+gemini_api_key_env: GEMINI_API_KEY  # fallback: env var holding the key
 gemini_model: gemini-2.5-flash      # current free-tier model (2.0-flash was retired Mar 2026)
 
 # --- Claude CLI brain settings ---

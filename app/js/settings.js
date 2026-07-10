@@ -195,6 +195,24 @@ async function renderSettings() {
       <div class="faint">Some settings apply to the next generation, not the current one.</div>
       <div class="row"><button class="btn primary" id="setSave">Save settings</button></div>
 
+      <div class="h">Smarter brain (optional)</div>
+      <div class="col" style="gap:8px">
+        <div class="faint">Chat runs on a free offline brain by default. For sharper edits (and, soon, letting it see your images), switch to Google Gemini. Free, about 2 minutes.</div>
+        <div class="row" style="gap:8px;align-items:center">
+          <span class="chip" id="brainStatus">Using: ${settings['brain'] === 'gemini_api' ? 'Gemini' : (settings['brain'] === 'claude' ? 'Claude CLI' : 'Local (free, offline)')}</span>
+        </div>
+        <ol class="faint" style="margin:2px 0 0 18px;padding:0;font-size:13px;line-height:1.6">
+          <li>Get a free key (no card needed): <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey &#8599;</a></li>
+          <li>Paste it below and press Turn on Gemini.</li>
+        </ol>
+        <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="geminiKey" type="password" placeholder="${settings['gemini_api_key'] ? 'Key already saved (paste a new one to change)' : 'Paste your Gemini key here'}" style="${ipt};flex:1;min-width:200px">
+          <button class="btn sm primary" id="geminiOn">Turn on Gemini</button>
+          ${settings['brain'] === 'gemini_api' ? '<button class="btn sm ghost" id="brainLocal">Back to local</button>' : ''}
+        </div>
+        <div id="geminiMsg" class="faint"></div>
+      </div>
+
       <div class="h">This computer</div>
       <div class="col" style="gap:12px">
         <div class="col" style="gap:4px">
@@ -243,6 +261,47 @@ async function renderSettings() {
   notify.onchange = () => { const p = loadPrefs(); p.notifyDone = notify.checked; savePrefs(p); };
 
   box.querySelector('#setTutorial').onclick = () => { close(); emit('open', 'tutorial'); };
+
+  // Smarter brain (Gemini) onboarding: paste key -> save + switch -> test.
+  const gOn = box.querySelector('#geminiOn');
+  const gKey = box.querySelector('#geminiKey');
+  const gMsg = box.querySelector('#geminiMsg');
+  if (gOn) {
+    gOn.onclick = () => {
+      const key = (gKey.value || '').trim();
+      const patch = { brain: 'gemini_api' };
+      if (key) { patch.gemini_api_key = key; }
+      gMsg.textContent = 'Turning on Gemini and testing your key...';
+      gOn.disabled = true;
+      const fail = (why) => {
+        // roll back to local so the app keeps working, and explain
+        api.saveSettings({ brain: 'local' }).catch(() => {});
+        const st = box.querySelector('#brainStatus'); if (st) { st.textContent = 'Using: Local (free, offline)'; }
+        gMsg.innerHTML = '<span style="color:var(--bad)">That did not work: ' + esc(why || 'check the key and try again') + '. Back on the local brain.</span>';
+      };
+      api.saveSettings(patch)
+        .then(() => api.brainTest())
+        .then((r) => {
+          gOn.disabled = false;
+          if (r && r.ok) {
+            gMsg.innerHTML = '<span style="color:var(--good)">&#10003; Gemini is on and working. Your edits are smarter now.</span>';
+            const st = box.querySelector('#brainStatus'); if (st) { st.textContent = 'Using: Gemini'; }
+            toast('Gemini enabled', 'good');
+          } else {
+            fail((r && r.detail) || 'the key did not work');
+          }
+        })
+        .catch((e) => { gOn.disabled = false; fail(e && e.message); });
+    };
+  }
+  const gLocal = box.querySelector('#brainLocal');
+  if (gLocal) {
+    gLocal.onclick = () => {
+      api.saveSettings({ brain: 'local' })
+        .then(() => { toast('Back on the local brain', 'good'); renderSettings(); })
+        .catch((e) => toast('Could not switch: ' + e.message, 'bad'));
+    };
+  }
   box.querySelector('#btnCheckpoints').onclick = () => { emit('open', 'checkpoints'); };
   const advT = box.querySelector('#advToggle');
   const advB = box.querySelector('#advBody');

@@ -62,6 +62,7 @@ DEFAULTS: Dict[str, Any] = {
     "ollama_model": "qwen2.5:3b-instruct",
     "ollama_url": "http://localhost:11434",
     "gemini_api_key_env": "GEMINI_API_KEY",
+    "gemini_api_key": "",  # paste a key here (via Settings) to use Gemini without an env var
     "gemini_model": "gemini-2.5-flash",
     "claude_cmd": "claude",
     "engine": "comfyui",
