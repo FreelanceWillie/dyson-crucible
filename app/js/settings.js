@@ -71,7 +71,7 @@ const ADVANCED_GROUPS = [
     ['ollama_model', 'Local model', { type: 'dynselect', source: 'ollama',
       hint: 'The local AI model that powers chat. Bigger = smarter but slower.' }],
     ['gemini_model', 'Gemini model', { type: 'select', opts: [
-      'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'], hint: 'Only used when Brain is set to Gemini.' }],
+      'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro', 'gemini-3-flash'], hint: 'Only used when Brain is set to Gemini.' }],
   ]],
   ['Ranking & vector', [
     ['rank.clip_model', 'Ranking model (CLIP)', { type: 'select', opts: ['ViT-B-32', 'ViT-L-14', 'ViT-H-14'],
