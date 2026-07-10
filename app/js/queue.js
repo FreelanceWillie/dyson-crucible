@@ -70,6 +70,36 @@ function renderRes() {
   const k = bar.querySelector('#qpanic'); if (k) { k.onclick = () => api.panic().then((r) => toast(r.vram_freed ? 'Machine reclaimed. GPU freed.' : 'Queue paused, gen stopped.', 'good')); }
 }
 
+// checkpoint (model) downloads: tracked globally so progress shows in the strip
+// even after the picker is closed, with a toast on finish.
+let ckptDls = {};   // id -> { name, pct, done, ok, error }
+let ckptPoll = null;
+
+function watchCkpt() {
+  if (ckptPoll) { return; }
+  const tick = async () => {
+    let d;
+    try { d = await api.checkpoints(); } catch (_) { return; }
+    const prog = d.progress || {};
+    let anyActive = false;
+    Object.keys(prog).forEach((id) => {
+      const p = prog[id] || {};
+      const name = ((d.catalog || []).find((c) => c.id === id) || {}).name || id;
+      const prev = ckptDls[id];
+      ckptDls[id] = { name, pct: p.pct || 0, done: !!p.done, ok: !!p.ok, error: p.error || '' };
+      if (!p.done) { anyActive = true; }
+      if (p.done && (!prev || !prev.done)) {  // completion transition -> toast once
+        if (p.ok) { toast(name + ' downloaded. Now drawing with it.', 'good'); }
+        else { toast(name + ' download failed. ' + (p.error || ''), 'bad'); }
+      }
+    });
+    renderQueue();
+    if (!anyActive && ckptPoll) { clearInterval(ckptPoll); ckptPoll = null; }
+  };
+  tick();
+  ckptPoll = setInterval(tick, 2000);
+}
+
 function renderQueue() {
   const q = state.queue || []; const strip = document.getElementById('queuestrip');
   if (!strip) { return; }
@@ -93,7 +123,11 @@ function renderQueue() {
     if (j.status === 'failed') { why = ` <a href="#" data-why="${j.id}" style="color:var(--bad)">why?</a>`; }
     return `<span class="pill ${j.status}" ${j.error ? `title="${esc(j.error).slice(0, 300)}"` : ''}>${lead}${esc(j.kind)}:${esc(j.asset)} ${esc(j.status)}${tries}${tail}${cancel}${why}</span>`;
   }).join(' ');
-  strip.innerHTML = `<b>Queue</b> <span class="chip">${active.length} active</span> ${chips || '<span class="faint">idle</span>'} <button class="btn sm ghost" id="qdiag">Diagnostics</button> <button class="btn sm ghost" id="qclear">Clear finished</button>`;
+  // model downloads (checkpoints) show here too, so a multi-GB download is visible
+  // app-wide even when the picker is closed.
+  const dlChips = Object.values(ckptDls).filter((d) => !d.done).map((d) =>
+    `<span class="pill running" title="Downloading a model">&#8681; ${esc(d.name)} ${Math.round(d.pct || 0)}%</span>`).join(' ');
+  strip.innerHTML = `<b>Queue</b> <span class="chip">${active.length} active</span> ${dlChips} ${chips || (dlChips ? '' : '<span class="faint">idle</span>')} <button class="btn sm ghost" id="qdiag">Diagnostics</button> <button class="btn sm ghost" id="qclear">Clear finished</button>`;
   strip.querySelectorAll('[data-cancel]').forEach((a) => a.onclick = (e) => { e.preventDefault(); api.qCancel(a.dataset.cancel).then(() => toast('Cancelled')); });
   strip.querySelectorAll('[data-why]').forEach((a) => a.onclick = (e) => {
     e.preventDefault();
@@ -151,5 +185,10 @@ function ring(pct) {
 export function mount() {
   on('resources', renderRes);
   on('queue', renderQueue);
+  on('ckptInstall', watchCkpt);   // a model download started -> show it in the strip
   renderRes(); renderQueue();
+  // If a download is already running (e.g. page was reloaded mid-download), pick it up.
+  api.checkpoints().then((d) => {
+    if (Object.values(d.progress || {}).some((p) => p && !p.done)) { watchCkpt(); }
+  }).catch(() => {});
 }

@@ -2,7 +2,7 @@
 // base models (the single biggest quality lever), one-click install with live
 // progress, and pick which installed model draws. Opened via emit('open','checkpoints').
 import { api } from './api.js';
-import { on, toast } from './state.js';
+import { on, emit, toast } from './state.js';
 
 const MINE = 'checkpoints';
 let data = { catalog: [], installed: [], active: '', progress: {} };
@@ -149,8 +149,13 @@ function cardHtml(c) {
 }
 
 function install(id) {
+  const name = ((data.catalog || []).find((c) => c.id === id) || {}).name || id;
   api.checkpointInstall(id, true)  // download, then make it the active model
-    .then(() => { toast('Download started. This runs in the background.', ''); load(); })
+    .then(() => {
+      toast('Downloading ' + name + '. It keeps going in the background; the bar below tracks it.', '');
+      emit('ckptInstall');  // let the bottom strip show progress even if this picker is closed
+      load();
+    })
     .catch((e) => toast('Could not start: ' + e.message, 'bad'));
 }
 
